@@ -1,0 +1,15 @@
+# NOTE: The data_base_dir must be set by the user
+# Either explicitly set it in this file or set it as a command-line argument
+# when running the train script.
+data_base_dir:
+log_dir:
+
+train: True
+test: True
+
+model_checkpoint:
+
+defaults:
+  - _self_
+  - dataset:
+  - experiment:
