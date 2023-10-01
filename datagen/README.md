@@ -3,6 +3,12 @@
 There are several possible datasets that can be generated:
 1. `laplace_box3d.sh` generates meshes in 3d boxes. Solves laplace equation with f=1, homogenous boundaries.
 
+## Converting to hdf5
+
+```console
+python mfem_to_hdf5.py --srcdir ../../../neural-schwarz-data/box3d-mesh-sol/ --outdir ./data
+```
+
 ## Dependencies:
 
 1. [netgen](https://docu.ngsolve.org/latest/index.html) is used to generate finite element meshes.
