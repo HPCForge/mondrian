@@ -1,3 +1,5 @@
+*.png
+
 # hdf5 files
 *.hdf5
 
