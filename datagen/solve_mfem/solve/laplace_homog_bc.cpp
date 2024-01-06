@@ -8,13 +8,13 @@ using namespace std;
 using namespace mfem;
 
 void solve_mesh(Mesh& mesh,
-	              int order,
-		      bool static_cond,
-		      bool pa,
-		      bool fa,
-		      bool algebraic_ceed,
-		      std::filesystem::path output_dir,
-		      std::string path_stem);
+	        int order,
+		bool static_cond,
+		bool pa,
+		bool fa,
+		bool algebraic_ceed,
+		std::filesystem::path output_dir,
+		std::string path_stem);
 
 int main(int argc, char *argv[])
 {

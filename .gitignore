@@ -1,3 +1,6 @@
+# netgen output volumes
+*.vol
+
 *.png
 
 # hdf5 files
