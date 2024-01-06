@@ -7,13 +7,15 @@ channels:
 dependencies:
   - python=3.9
   - pytorch
-  - torchvision
   - pytorch-cuda=11.7
+  - torchvision
   - pyg
   - pytorch-scatter
+  - pytorch-sparse
   - numpy
   - h5py
   - numba
+  - torchdeq
   - pip
   - pip:
     - hydra-core
@@ -26,5 +28,3 @@ dependencies:
     - zarr
     - opt_einsum
     - wandb
-    - jupyterlab
-    - ngsolve
