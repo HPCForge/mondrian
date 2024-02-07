@@ -1,3 +1,6 @@
+# Pytorch models and tensors
+*.pt
+
 # netgen output volumes
 *.vol
 
