@@ -54,7 +54,9 @@ def main():
     test_size = len(dataset) - train_size
     train_dataset, val_datset = torch.utils.data.random_split(dataset, (train_size, test_size))
 
-    train_dataloader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+    train_dataloader = DataLoader(train_dataset,
+                                  batch_size=32,
+                                  shuffle=True)
     val_dataloader = DataLoader(train_dataset, batch_size=32, shuffle=False)
 
     sample_input, sample_label = dataset[0]
@@ -92,7 +94,7 @@ def main():
         pred_h_y = torch.fft.rfft(pred).abs().square().mean(dim=-2)
         label_h_y = torch.fft.rfft(label).abs().square().mean(dim=-2)
 
-        rel_err = torch.fft.rfft(abs(pred - label)).abs().square().mean(dim=-2)
+        abs_err = torch.fft.rfft(abs(pred - label)).abs().square().mean(dim=-2)
 
         size = pred_h_y.size(1) - 1
         fig, axarr = plt.subplots(1, 2)
@@ -100,14 +102,9 @@ def main():
         axarr[0].plot(range(size), label_h_y[0, 1:], label='label')
         axarr[0].legend()
         axarr[0].set_yscale('log')
-        axarr[1].plot(range(size), rel_err[0, 1:])
-        plt.savefig('poisson_sol.png')
+        axarr[1].plot(range(size), abs_err[0, 1:])
+        plt.savefig('poisson_fft_err.png')
         plt.close()
-
-        #fig, axes = plt.subplots(1, 2)
-        #axes[0].imshow(pred_h_y.cpu()[0])
-        #axes[1].imshow(label_h_y.cpu()[0])
-        #plt.tight_layout()
 
     torch.save(model, 'model.pt')
 

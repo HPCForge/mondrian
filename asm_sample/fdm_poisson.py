@@ -108,7 +108,9 @@ def solve_poisson(
     b -= A @ u
     
     Ap = A[is_free,:][:,is_free]
-    sol, info = sc.linalg.cg(A=Ap, b=b[is_free])
+    M = sc.lil_array(Ap.shape)
+    M.setdiag(1/4)
+    sol, info = sc.linalg.cg(A=Ap, b=b[is_free], M=M)
     assert info == 0
     u[is_free] = sol
 

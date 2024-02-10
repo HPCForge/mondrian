@@ -4,6 +4,7 @@ import fdm_poisson
 from fdm_poisson import BoundaryCondition
 import matplotlib.pyplot as plt
 from train import Solver
+import math
 
 class SubdomainSolver:
     def __init__(self, xlim, ylim, res_per_unit):
@@ -58,6 +59,7 @@ def asm(g: BoundaryCondition,
     subdomain_start = torch.arange(0, u.size(1), subdomain_step).to(int)
     print(subdomain_start)
 
+    iters = []
     for i in range(10):
         for subdomain in range(n_subdomains):
             start_col = subdomain_start[subdomain]
@@ -66,34 +68,71 @@ def asm(g: BoundaryCondition,
             assert subdomain.size(1) == subdomain_solver.m
 
             g = fdm_poisson.read_boundary(subdomain)
-            sol = subdomain_solver.solve(g)
+            sol = subdomain_solver.solve(g).detach()
             fdm_poisson.write_boundary(sol, g)
             u[:,start_col:start_col + res_per_unit] = sol
+        iters.append(u.clone())
+    return iters, u
 
-        print(u)
-        plt.imshow(u.detach().cpu())
-        plt.savefig(f'asm_sol{i}.png')
+def series(x, res):
+    total = torch.zeros(x.size(0))
+    for k in range(1, res + 3):
+        total += 2**-k * (torch.sin(k * 2 * math.pi * x) + 1)
+    return total
 
 def main():
     res_per_unit = 100
     ylim = 1
-    xlim = 2.6
+    xlim = 4.2
     width_res = int(xlim * res_per_unit)
     height_res = int(ylim * res_per_unit)
 
+    x = torch.linspace(0, xlim, width_res)
+    y = torch.linspace(0, ylim, height_res)
+    top = series(x, width_res)
+
+    top = torch.zeros(width_res)
+
     g = BoundaryCondition(
-        top=torch.ones(width_res) / 2,
-        right=torch.ones(height_res) / 2,
+        top=top,
+        right=torch.ones(height_res),
         bottom=torch.zeros(width_res),
-        left=torch.ones(height_res) / 2,
+        left=torch.ones(height_res) 
     )
 
-    #fdm_ss = FDMSubdomainSolver(1, 1, res_per_unit)
-    #asm(g, xlim, ylim, fdm_ss)
+    x, y = torch.meshgrid(x[1:-1], y[1:-1], indexing='xy')
+    f = np.ones((height_res-2, width_res-2))
 
-    model = torch.load('model.pt')
-    nn_ss = NNSubdomainSolver(model, 1, 1, res_per_unit)
-    asm(g, xlim, ylim, nn_ss)
+    g_npy = fdm_poisson.boundary_to_numpy(g)        
+    gt_sol_npy = fdm_poisson.solve_poisson(g_npy, f, xlim, ylim)
+    gt_sol = torch.from_numpy(gt_sol_npy)
+
+    fdm_ss = FDMSubdomainSolver(1, 1, res_per_unit)
+    asm_iters, fdm_sol = asm(g, xlim, ylim, fdm_ss)
+
+    #model = torch.load('model.pt')
+    #nn_ss = NNSubdomainSolver(model, 1, 1, res_per_unit)
+    #asm_iters, nn_sol = asm(g, xlim, ylim, nn_ss)
+
+    for idx, asm_iter in enumerate(asm_iters):
+        fig, axarr = plt.subplots(2, 1)
+        axarr[0].imshow(gt_sol.cpu())
+        axarr[1].imshow(asm_iter.detach().cpu())
+        plt.savefig(f'asm_sol{idx}.png')
+        plt.close()
+
+    # mean of fft of u in the y-direction
+    gt_h_y = torch.fft.rfft(gt_sol[:, 160:160+res_per_unit], dim=0).abs()
+    gt_h_y_mean = gt_h_y.mean(dim=1)
+    plt.plot(gt_h_y_mean, label='ground truth', c='b')
+
+    for idx, i in enumerate(asm_iters):
+        nn_h_y = torch.fft.rfft(i[:, 160:160+res_per_unit], dim=0).abs()
+        nn_h_y_mean = nn_h_y.mean(dim=1)
+        plt.plot(nn_h_y_mean, label=f'nn-iter {idx}')
+        plt.yscale('log')
+    plt.legend()
+    plt.savefig('spectra.png')
 
 if __name__ == '__main__':
     main()

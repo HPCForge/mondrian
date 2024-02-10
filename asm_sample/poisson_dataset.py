@@ -16,11 +16,11 @@ class BCGenerator:
         edge_type = self.get_edge_type()
         if edge_type == 0:
             return np.zeros(n)
-        if edge_type < 3:
+        if edge_type < 5:
             val = self.rng.uniform(-1, 1)
             return np.full(n, val)
         if edge_type < 11:
-            amp = self.rng.uniform(low=-10, high=10)
+            amp = self.rng.uniform(low=-1, high=1)
             freq = self.rng.uniform(low=1, high=20)
             inner_offset = self.rng.uniform(0, 2 * np.pi)
             outer_offset = self.rng.uniform(-1, 1)
