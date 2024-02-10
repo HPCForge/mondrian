@@ -14,6 +14,7 @@ def main(args):
     print(f'Saving meshes to {outdir}')
 
     for i in range(args.count):
+        print(f'Meshing [{i}/{args.count}]')
         dims = rng.uniform(low=args.min_size, high=args.max_size, size=3)
 
         cube = OrthoBrick(Pnt(0,0,0), Pnt(dims[0],dims[1],dims[2]))

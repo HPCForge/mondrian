@@ -35,7 +35,7 @@ def gaussian_field_3d(grid_res, k, Pk, seed):
     print(df_3d.min(), df_3d.max())
     return df_3d
 
-def random_gaussian_field_3d(grid_res, seed):
+def random_gaussian_field_3d(grid_res, seed, highest_freq=None):
     """ Generates a random gaussian field interpolating
     power spectrum proportional to 1 / k**p.
     Args:
@@ -44,9 +44,11 @@ def random_gaussian_field_3d(grid_res, seed):
     Returns:
         A VoxelCoefficient for a random Gaussian field.
     """
+    if not highest_freq:
+        highest_freq = grid_res / 2
     rng = np.random.default_rng(seed=seed)
     power = rng.uniform(low=2.0, high=3.0)
-    k = 1 + np.arange(grid_res / 2).astype(np.float32)
+    k = 1 + np.arange(highest_freq).astype(np.float32)
     Pk = 1 / (k ** power).astype(np.float32)
     return gaussian_field_3d(grid_res, k, Pk, seed)
 
@@ -54,7 +56,7 @@ def get_rhs(grid_res, random, seed):
     if not random:
         return CoefficientFunction(32 * (z*(1-z) + y*(1-y) + x*(1-x)))
     else:
-        df_3d = 32 * random_gaussian_field_3d(grid_res, seed)
+        df_3d = random_gaussian_field_3d(grid_res, seed)
         return VoxelCoefficient((0,0,0), (1,1,1), df_3d.astype(float), linear=True) 
 
 def get_coeff(grid_res, min_coeff, random, seed):
@@ -75,6 +77,9 @@ def get_boundary(grid_res, random, seed):
         return CoefficientFunction(0)
     else:
         df_3d = random_gaussian_field_3d(grid_res, seed)
+        # force values to be greater than or equal to 0
+        df_3d += np.abs(df_3d.min())
+        print('BOUNDARY RANGE: ', df_3d.min(), df_3d.max())
         return VoxelCoefficient((0,0,0), (1,1,1), df_3d.astype(float), linear=True) 
 
 def solve_poisson(mesh: Mesh,
@@ -146,6 +151,7 @@ def main():
     # be higher than the resolution of the domain.
     grf_grid_res = 128
 
+    Path(args.write_dir).mkdir(parents=True, exist_ok=True)
     with h5py.File(f'{args.write_dir}/poisson.hdf5', 'w') as point_cloud_file:
         # solve multiple problems per mesh file, with different seeds
         repeat_mesh_files = [mesh_file for mesh_file in mesh_files for _ in range(args.problems_per_mesh)]
@@ -200,8 +206,7 @@ def main():
             assert not np.isnan(interior_forcing).any()
             assert not np.isnan(interior_coeff).any()
 
-            #mesh_file_stem = Path(mesh_file).stem
-            mesh_file_stem = str(seed).zfill(len(repeat_mesh_files))
+            mesh_file_stem = str(seed).zfill(len(str(len(repeat_mesh_files))))
             point_cloud_group = point_cloud_file.create_group(mesh_file_stem)
             point_cloud_group.create_dataset('interior_coords', data=interior_coords)
             point_cloud_group.create_dataset('interior_solution', data=interior_solution)
