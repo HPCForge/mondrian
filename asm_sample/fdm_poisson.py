@@ -4,6 +4,11 @@ import scipy.sparse as sc
 from dataclasses import dataclass
 import matplotlib.pyplot as plt
 import torch
+from mondrian_lib.fdm_boundary_util import (
+    BoundaryCondition,
+    write_boundary,
+    read_boundary,
+)
 
 def poisson_1d_matrix(n):
     ex = np.ones(n)
@@ -11,52 +16,6 @@ def poisson_1d_matrix(n):
     offsets = np.array([-1, 0, 1])
     T = sc.dia_array((data, offsets), shape=(n, n)).toarray()
     return T
-
-@dataclass
-class BoundaryCondition:
-    top: np.array
-    bottom: np.array
-    left: np.array
-    right: np.array
-
-def write_boundary(u, g):
-    u[-1, :] = g.top
-    u[:, -1] = g.right
-    u[0, :] = g.bottom
-    u[:, 0] = g.left
-    return u
-
-def read_boundary(u):
-    return BoundaryCondition(
-        top=u[-1, :],
-        right=u[:, -1],
-        bottom=u[0, :],
-        left=u[:, 0]
-    )
-
-def boundary_to_torch(g):
-    return BoundaryCondition(
-        top=torch.from_numpy(g.top),
-        right=torch.from_numpy(g.right),
-        bottom=torch.from_numpy(g.bottom),
-        left=torch.from_numpy(g.left)
-    )
-
-def boundary_to_numpy(g):
-    return BoundaryCondition(
-        top=g.top.numpy(),
-        right=g.right.numpy(),
-        bottom=g.bottom.numpy(),
-        left=g.left.numpy()
-    )
-
-def boundary_to_vec(bc):
-    """ Conctenate boundaries in clock-wise order
-    """
-    if torch.is_tensor(bc.top):
-        return torch.cat((bc.top, bc.right, bc.bottom, bc.left))
-    else:
-        return np.concatenate((bc.top, bc.right, bc.bottom, bc.left))
 
 def solve_poisson(
         g,

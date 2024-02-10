@@ -1,10 +1,18 @@
 import torch
 import numpy as np
 import fdm_poisson
-from fdm_poisson import BoundaryCondition
 import matplotlib.pyplot as plt
 from train import Solver
 import math
+
+from mondrian_lib.fdm_boundary_util import (
+    BoundaryCondition,
+    boundary_to_numpy,
+    boundary_to_torch,
+    read_boundary,
+    write_boundary,
+    boundary_to_vec
+)
 
 class SubdomainSolver:
     def __init__(self, xlim, ylim, res_per_unit):
@@ -21,7 +29,7 @@ class FDMSubdomainSolver(SubdomainSolver):
 
     def solve(self, g: BoundaryCondition):
         # the fdm solver uses numpy, so have to convert from/to torch
-        g_npy = fdm_poisson.boundary_to_numpy(g)        
+        g_npy = boundary_to_numpy(g)        
         sol_npy = fdm_poisson.solve_poisson(g_npy, self.f, self.xlim, self.ylim)
         return torch.from_numpy(sol_npy)
 
@@ -31,7 +39,7 @@ class NNSubdomainSolver(SubdomainSolver):
         self.model = model
 
     def solve(self, g: BoundaryCondition):
-        input = fdm_poisson.boundary_to_vec(g)
+        input = boundary_to_vec(g)
         pred = self.model(input)
         return pred.reshape((self.n, self.m))
 
@@ -46,7 +54,7 @@ def asm(g: BoundaryCondition,
     is_bdy[1:-1, 1:-1] = False
 
     u = torch.zeros((global_n, global_m))
-    u = fdm_poisson.write_boundary(u, g)
+    u = write_boundary(u, g)
 
     assert u.size(0) == global_n
     assert u.size(1) == global_m
@@ -67,9 +75,9 @@ def asm(g: BoundaryCondition,
             assert subdomain.size(0) == subdomain_solver.n
             assert subdomain.size(1) == subdomain_solver.m
 
-            g = fdm_poisson.read_boundary(subdomain)
+            g = read_boundary(subdomain)
             sol = subdomain_solver.solve(g).detach()
-            fdm_poisson.write_boundary(sol, g)
+            write_boundary(sol, g)
             u[:,start_col:start_col + res_per_unit] = sol
         iters.append(u.clone())
     return iters, u
@@ -103,7 +111,7 @@ def main():
     x, y = torch.meshgrid(x[1:-1], y[1:-1], indexing='xy')
     f = np.ones((height_res-2, width_res-2))
 
-    g_npy = fdm_poisson.boundary_to_numpy(g)        
+    g_npy = boundary_to_numpy(g)        
     gt_sol_npy = fdm_poisson.solve_poisson(g_npy, f, xlim, ylim)
     gt_sol = torch.from_numpy(gt_sol_npy)
 

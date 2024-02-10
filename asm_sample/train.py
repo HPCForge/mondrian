@@ -3,7 +3,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 import h5py
 from torch.utils.data import Dataset, DataLoader
-from fdm_poisson import read_boundary, write_boundary, boundary_to_vec
+from mondrian_lib.fdm_boundary_util import (
+    read_boundary,
+    write_boundary,
+    boundary_to_vec
+)
 import matplotlib.pyplot as plt
 
 class Solver(nn.Module):
