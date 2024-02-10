@@ -1,4 +1,4 @@
-name: neural-schwarz
+name: neural-schwarz-test
 channels:
   - numba
   - pytorch
@@ -6,7 +6,7 @@ channels:
   - pyg
 dependencies:
   - python=3.9
-  - pytorch
+  - pytorch=2.0.1
   - pytorch-cuda=11.7
   - torchvision
   - pyg
@@ -15,11 +15,10 @@ dependencies:
   - numpy
   - h5py
   - numba
-  - torchdeq
   - pip
   - pip:
     - hydra-core
-    - neuraloperator
+    - neuraloperator=0.2.0
     - opencv-python
     - matplotlib
     - tensorboard
@@ -28,3 +27,4 @@ dependencies:
     - zarr
     - opt_einsum
     - wandb
+    - torchdeq
