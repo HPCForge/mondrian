@@ -18,12 +18,13 @@ dependencies:
   - pip
   - pip:
     - hydra-core
-    - neuraloperator=0.2.0
+    - neuraloperator=0.3.0
     - opencv-python
     - matplotlib
     - tensorboard
     - tensorly
     - tensorly-torch
+    - torch-harmonics
     - zarr
     - opt_einsum
     - wandb
