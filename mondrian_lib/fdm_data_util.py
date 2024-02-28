@@ -1,6 +1,7 @@
 import numpy as np
 import time
 import density_field_library as DFL
+from scipy.ndimage import gaussian_filter
 
 def gaussian_field_2d(grid_res, box_size, k, Pk, seed):
     """ Use Pylians to generate a Gaussian random field. 
@@ -29,6 +30,8 @@ def darcy_coeff(grid_res, box_size, power=4, seed=None):
     mask = grf <= 0
     grf[mask] = 3
     grf[~mask] = 12
+    # FDM seems to have issues with discontinuous coefficients.
+    grf = gaussian_filter(grf, sigma=1)
     return grf
 
 if __name__ == '__main__':
