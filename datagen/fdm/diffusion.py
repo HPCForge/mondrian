@@ -5,6 +5,7 @@ import h5py
 from dataclasses import dataclass
 from mondrian_lib.fdm_boundary_util import BoundaryCondition
 from mondrian_lib.fdm_data_util import darcy_coeff
+import multiprocessing
 
 class VariableDiffusionPDE(pde.PDEBase):
     def __init__(self, diffusivity: np.array, bc, forcing):
@@ -30,10 +31,10 @@ class VariableDiffusionPDE(pde.PDEBase):
 def solve_diffusion(xlim, ylim):
     assert isinstance(xlim, int)
     assert isinstance(ylim, int)
-    rows = int(ylim * 64)
-    cols = int(xlim * 64)
+    rows = int(ylim * 32)
+    cols = int(xlim * 32)
     grid = pde.CartesianGrid(([0, ylim], [0, xlim]), (rows, cols))
-    state = pde.ScalarField.random_uniform(grid)
+    state = pde.ScalarField.random_uniform(grid, 0.1, 0.5)
 
     field_dim = max(rows, cols)
     box_size = max(xlim, ylim)
@@ -45,33 +46,41 @@ def solve_diffusion(xlim, ylim):
     eq = VariableDiffusionPDE(diffusivity, bc=bc, forcing=1)
 
     storage = pde.MemoryStorage()
-    solver = pde.ScipySolver(eq)
+    trackers = [
+        #'progress',
+        storage.tracker(0.001)
+    ]
+
+    solver = pde.ExplicitSolver(eq, scheme='runge-kutta', backend='numpy', adaptive=True)
     controller = pde.Controller(solver,
-                                t_range=0.02,
-                                tracker=['progress', storage.tracker(0.001)])
-    result = controller.run(state, dt=1e-4)
+                                t_range=0.03,
+                                tracker=trackers)
+    result = controller.run(state, dt=1e-3)
 
     return diffusivity, storage
 
-dataset_size = 10
+class Solver():
+    def __init__(self, domain_size):
+        self.domain_size = domain_size
+
+    def __call__(self, i):
+        xlim, ylim = domain_size, domain_size
+        diffusivity, storage = solve_diffusion(xlim, ylim)
+        diff = np.squeeze(diffusivity.data)
+        solution = np.stack([s.data for s in storage]) 
+        return diff, solution, xlim, ylim
+
+dataset_size = 200
 with h5py.File('./diffusion.hdf5', 'w') as f:
     zfill_cnt = len(str(dataset_size))
     domain_sizes = [1, 2, 4]
     for domain_size in domain_sizes:
         size_group = f.create_group(f'{domain_size}_{domain_size}')
-        for i in range(dataset_size):
-            xlim, ylim = domain_size, domain_size
-            diffusivity, storage = solve_diffusion(xlim, ylim)
-            diff = np.squeeze(diffusivity.data)
-            solution = np.stack([s._data_full for s in storage]) 
+        with multiprocessing.Pool(processes=20) as pool:
+            output = pool.map(Solver(domain_size), range(dataset_size))
+        for i, (diff, solution, xlim, ylim) in enumerate(output):
             g = size_group.create_group(str(i).zfill(zfill_cnt))
             g.create_dataset('diffusivity', data=diff)
             g.create_dataset('solution', data=solution)
             g.attrs['xlim'] = xlim
             g.attrs['ylim'] = ylim
-
-#for i in range(len(storage)):
-#    fix, axarr = plt.subplots(1, 2)
-#    axarr[0].imshow(diff.data)
-#    axarr[1].imshow(storage[i].data)
-#    plt.savefig(f'result{i}.png')
