@@ -7,28 +7,7 @@ SOLUTION = 'solution'
 XLIM = 'xlim'
 YLIM = 'ylim'
 
-FIELD_KEYS = [
-    DIFFUSIVITY,
-    SOLUTION
-]
-
-def diffusion_collate_fn(data_list):
-    # group data by domain size
-    data_dict = {}
-    for datum in data_list:
-        size_key = datum[0]
-        if size_key in data_dict:
-            data_dict[size_key].append(datum[1:])
-        else:
-            data_dict[size_key] = [datum[1:]]
-
-    # stack items in each group into batches
-    for size_key in data_dict.keys():
-        data_dict[size_key] = default_collate(data_dict[size_key])
-
-    return data_dict
-
-class DiffusionDataset(Dataset):
+class AllenCahnDataset(Dataset):
     def __init__(self, filename):
         self.f = h5py.File(filename, 'r')
         
@@ -41,17 +20,17 @@ class DiffusionDataset(Dataset):
 
         self._min, self._max = self._extents()
 
-        # 3 timesteps + diffusivity
-        self.in_channels = 6
+        # 6 timesteps + diffusivity + coords
+        self.in_channels = 9
         # remove 4 timesteps
         size_key, sim_key = self.keys[0]
-        self.out_channels = self.f[size_key][sim_key][SOLUTION].shape[0] - 4 
+        self.out_channels = self.f[size_key][sim_key][SOLUTION].shape[0] - 7 
 
     def _extents(self):
         _min = {DIFFUSIVITY: float('inf'), SOLUTION: float('inf')}
         _max = {DIFFUSIVITY: float('-inf'), SOLUTION: float('-inf')}
         for size_key, sim_key in self.keys:
-            diff = self.f[size_key][sim_key][DIFFUSIVITY][:]
+            diff = self.f[size_key][sim_key].attrs[DIFFUSIVITY]
             _min[DIFFUSIVITY] = min(_min[DIFFUSIVITY], diff.min())
             _max[DIFFUSIVITY] = max(_max[DIFFUSIVITY], diff.max())
             sol = self.f[size_key][sim_key][SOLUTION][:]
@@ -74,16 +53,16 @@ class DiffusionDataset(Dataset):
     def __getitem__(self, idx):
         size_key, sim_key = self.keys[idx]
         grp = self.f[size_key][sim_key]
-        diffusivity = self._lookup_normalized(grp, DIFFUSIVITY).unsqueeze(0)
         solution = self._lookup_normalized(grp, SOLUTION)
+        diffusivity_scalar = self._normalize(grp.attrs[DIFFUSIVITY], DIFFUSIVITY)
+        diffusivity = torch.full_like(solution[0], diffusivity_scalar).unsqueeze(0)
         xlim = grp.attrs[XLIM]
         ylim = grp.attrs[YLIM]
         xcoords = torch.linspace(-xlim, xlim, solution.size(2)) / 8
         ycoords = torch.linspace(-ylim, ylim, solution.size(1)) / 8
         xcoords, ycoords = torch.meshgrid(xcoords, ycoords, indexing='xy')
         xcoords, ycoords = xcoords.unsqueeze(0), ycoords.unsqueeze(0)
-        input = torch.cat((solution[1:4], diffusivity, xcoords, ycoords))
-        #input = torch.cat((solution[1:4], diffusivity))
-        label = solution[4:]
+        input = torch.cat((solution[1:7], diffusivity, xcoords, ycoords))
+        label = solution[7:]
         print(input.size(), label.size())
         return size_key, input, label, xlim, ylim
