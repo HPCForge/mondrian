@@ -1,0 +1,12 @@
+name: bubbleml
+
+train_path: 'datagen/bubbleml/bubbleml_train.h5py'
+test_path: 'datagen/bubbleml/bubbleml_test.h5py'
+
+train_cfg:
+  batch_size: 16
+  max_epochs: 50
+
+model_cfg:
+  model_name: pdebench_unet
+  init_features: 32

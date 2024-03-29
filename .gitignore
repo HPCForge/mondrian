@@ -1,3 +1,6 @@
+lightning_logs/
+outputs/
+
 # Pytorch models and tensors
 *.pt
 

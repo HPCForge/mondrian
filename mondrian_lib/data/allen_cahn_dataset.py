@@ -20,11 +20,11 @@ class AllenCahnDataset(Dataset):
 
         self._min, self._max = self._extents()
 
-        # 6 timesteps + diffusivity + coords
-        self.in_channels = 9
-        # remove 4 timesteps
+        # 3 timesteps + diffusivity + coords (added after augmentations)
+        self.t_start = 5
+        self.in_channels = self.t_start + 1 + 2
         size_key, sim_key = self.keys[0]
-        self.out_channels = self.f[size_key][sim_key][SOLUTION].shape[0] - 7 
+        self.out_channels = self.f[size_key][sim_key][SOLUTION].shape[0] - self.t_start 
 
     def _extents(self):
         _min = {DIFFUSIVITY: float('inf'), SOLUTION: float('inf')}
@@ -62,7 +62,8 @@ class AllenCahnDataset(Dataset):
         ycoords = torch.linspace(-ylim, ylim, solution.size(1)) / 8
         xcoords, ycoords = torch.meshgrid(xcoords, ycoords, indexing='xy')
         xcoords, ycoords = xcoords.unsqueeze(0), ycoords.unsqueeze(0)
-        input = torch.cat((solution[1:7], diffusivity, xcoords, ycoords))
-        label = solution[7:]
+        #input = torch.cat((solution[1:7], diffusivity, xcoords, ycoords))
+        input = torch.cat((solution[:self.t_start], diffusivity))
+        label = solution[self.t_start:]
         print(input.size(), label.size())
         return size_key, input, label, xlim, ylim

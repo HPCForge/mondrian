@@ -3,8 +3,8 @@ import torch.nn as nn
 from neuralop.layers.padding import DomainPadding
 from neuralop.layers.spectral_convolution import SpectralConv
 from neuralop.layers.mlp import MLP
-from mondrian_lib.models.fdm.get_subdomain_indices import get_subdomain_indices
-from mondrian_lib.models.fdm.coarse_op.coarse_op_cnn import CoarseOpCNN
+from mondrian_lib.fdm.get_subdomain_indices import get_subdomain_indices
+from mondrian_lib.fdm.coarse_op.coarse_op_cnn import CoarseOpCNN
 
 class DDOpBase(nn.Module):
     def __init__(

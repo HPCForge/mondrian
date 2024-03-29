@@ -3,8 +3,8 @@ import torch.nn as nn
 from neuralop.layers.padding import DomainPadding
 from neuralop.layers.spectral_convolution import SpectralConv
 from neuralop.layers.mlp import MLP
-from mondrian_lib.models.fdm.get_subdomain_indices import get_subdomain_indices
-from mondrian_lib.models.fdm.dd_op.dd_op_base import DDOpBase
+from mondrian_lib.fdm.get_subdomain_indices import get_subdomain_indices
+from mondrian_lib.fdm.dd_op.dd_op_base import DDOpBase
 
 class DDOpAdditive(DDOpBase):
     def __init__(
@@ -33,11 +33,12 @@ class DDOpAdditive(DDOpBase):
                 h_in = t[:,:,y:y+res_per_y,x:x+res_per_x].clone()
                 h_in_pad = self.padding.pad(h_in)
                 h_in_pad = self.layer(h_in_pad)
-                h_out = self.padding.unpad(h_in_pad) + self.mlp_skip(h_in)
+                h_out = self.padding.unpad(h_in_pad)
                 h[:,:,y:y+res_per_y,x:x+res_per_x] += h_out
                 mask[:,:,y:y+res_per_y,x:x+res_per_x] += 1
         h_damp = h / mask
         c = self.c(t, global_xlim, global_ylim)
         h = torch.cat((h_damp, c), dim=1)
         h = self.mlp_combine(h)
+        h = h + self.mlp_skip(t)
         return h

@@ -2,8 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from neuralop.layers.mlp import MLP
-from mondrian_lib.models.fdm.get_subdomain_indices import get_subdomain_indices
-from mondrian_lib.models.fdm.unet2d import UNet2d
+from mondrian_lib.fdm.get_subdomain_indices import get_subdomain_indices
 
 class CoarseOpCNN(nn.Module):
     def __init__(
@@ -30,6 +29,7 @@ class CoarseOpCNN(nn.Module):
             nn.GELU(),
             nn.Conv2d(hidden_channels, hidden_channels, kernel_size=kernel_size, padding=padding, stride=stride),
             nn.GELU(),
+            nn.Conv2d(hidden_channels, hidden_channels, kernel_size=kernel_size, padding=padding, stride=stride),
         )
 
     def forward(self, t, global_xlim, global_ylim):
@@ -40,14 +40,15 @@ class CoarseOpCNN(nn.Module):
         res_per_x = x_res / global_xlim
         res_per_y = y_res / global_ylim
 
-        print(x_res, y_res, global_xlim, global_ylim)
-
         sample_stride = 8
         h = t[:, :, ::sample_stride, ::sample_stride]
         h = self.conv(h)
 
+        return F.interpolate(h, size=t.size()[-2:], mode='bilinear')
+        
         # TODO: writing back into solution is probably bad!
-        tp = t.clone()
-        tp[:, :, ::sample_stride, ::sample_stride] = h
+        #tp = t.clone()
+        #tp = torch.zeros_like(t)
+        #tp[:, :, ::sample_stride, ::sample_stride] = h
 
-        return tp
+        #return tp

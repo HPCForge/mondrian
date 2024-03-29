@@ -1,0 +1,13 @@
+name: shear_layer
+
+data_path: '/pub/afeeney/data/data'
+
+train_cfg:
+  batch_size: 16
+  max_epochs: 50
+
+model_cfg:
+  model_name: ffno
+  modes: 32
+  width: 64
+  layer_norm: True

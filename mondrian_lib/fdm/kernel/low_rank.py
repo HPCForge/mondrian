@@ -13,15 +13,19 @@ class LowRankKernel(nn.Module):
         self.out_size = out_size
         self.rank = rank
 
-        hidden_size = 64
+        hidden_size = 32
 
         self.psi = nn.Sequential(
                 nn.Linear(2, hidden_size),
+                nn.GELU(),
+                nn.Linear(hidden_size, hidden_size),
                 nn.GELU(),
                 nn.Linear(hidden_size, self.rank * self.in_size))
 
         self.phi = nn.Sequential(
                 nn.Linear(2, hidden_size),
+                nn.GELU(),
+                nn.Linear(hidden_size, hidden_size),
                 nn.GELU(),
                 nn.Linear(hidden_size, self.rank * self.out_size))
 
@@ -64,20 +68,4 @@ class LowRankKernel(nn.Module):
         # [batch, H, W, m]  
         u = (dot * phi).sum(3)
         # [batch, m, H, W]  
-        return u.permute(0, 3, 1, 2)
-
-        """
-        for r in range(self.rank):
-            # [H, W, in_size]
-            psi_r = self.psi[r](x)
-            # [H, W, out_size]
-            phi_r = self.phi[r](x)
-
-            # [batch, H, W, in_size]
-            vp = v.permute(0, 2, 3, 1)
-            # [batch, H, W, 1]
-            dot = (psi_r * vp * delta_x).sum(-1).unsqueeze(-1)
-            u_r = dot * phi_r
-            u += u_r
-        """
         return u.permute(0, 3, 1, 2)

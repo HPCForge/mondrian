@@ -34,6 +34,20 @@ def darcy_coeff(grid_res, box_size, power=4, seed=None):
     grf = gaussian_filter(grf, sigma=1)
     return grf
 
+def allen_cahn_coeff(grid_res, box_size, power=4, seed=None):
+    assert power > 0
+    if seed is None:
+        seed = int(time.time())
+    k = np.arange(1, grid_res+1).astype(np.float32)
+    pk = k ** -power
+    grf = gaussian_field_2d(grid_res, box_size, k, pk, seed)
+    mask = grf <= 0
+    grf[mask] = -0.9
+    grf[~mask] = 0.9
+    # FDM seems to have issues with discontinuous coefficients.
+    grf = gaussian_filter(grf, sigma=1)
+    return grf
+
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
     p = darcy_coeff(512)
