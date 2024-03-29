@@ -18,6 +18,7 @@ dependencies:
   - pip
   - pip:
     - hydra-core
+    - lightning
     - neuraloperator=0.3.0
     - opencv-python
     - matplotlib
@@ -29,3 +30,4 @@ dependencies:
     - opt_einsum
     - wandb
     - torchdeq
+    - einops
