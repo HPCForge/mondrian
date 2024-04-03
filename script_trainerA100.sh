@@ -12,4 +12,4 @@
 source ~/.bashrc
 export PYTHONPATH=$(pwd)
 conda activate nsch
-python -u src/torchdeq_fdm.py
+python -u mondrian_lib/trainer/allen_cahn_trainer_deq.py

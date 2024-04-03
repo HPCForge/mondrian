@@ -70,7 +70,7 @@ def main():
 
     print("[1] Initialize Datasets")
 
-    pretraining = 0.2
+    pretraining = 0.01
     training = 1.0 - pretraining
     train_size = int(0.7 * len(dataset))
     val_size   = len(dataset) - train_size
