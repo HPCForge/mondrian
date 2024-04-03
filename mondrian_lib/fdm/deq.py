@@ -51,7 +51,7 @@ class DEQ_DDFNO(nn.Module):
         self.in_channels = in_channels
         self.out_channels = out_channels
 
-        self.ddfno = DDFNO(in_channels, out_channels, n_modes)
+        self.ddfno = DDFNO(n_modes)
         register_deq("DEQ_DDFNO", DEQ_DDFNO)
         self.deq = get_deq(core="sliced")
 
