@@ -11,39 +11,57 @@ class DDOpBase(nn.Module):
         self,
         layer: nn.Module,
         hc: int,
-        op_xlim: float,
-        op_ylim: float,
+        domain_size_x: float,
+        domain_size_y: float,
+        subdomain_size_x: float,
+        subdomain_size_y: float,
         overlap: float,
-        domain_padding:float ,
+        domain_padding:float,
         use_coarse_op: bool
     ):
         super().__init__()
         self.layer = layer
 
-        self.op_xlim = op_xlim
-        self.op_ylim = op_ylim
+        self.domain_size_x = domain_size_x
+        self.domain_size_y = domain_size_y
+        self.subdomain_size_x = subdomain_size_x
+        self.subdomain_size_y = subdomain_size_y
+
         self.overlap = overlap
 
-        CoarseOp = CoarseOpCNN
-        self.c = CoarseOp(1, hc, hc, hc, op_xlim, op_ylim) 
+        self.use_coarse_op = use_coarse_op
+        if self.use_coarse_op:
+            CoarseOp = CoarseOpCNN
+            self.c = CoarseOp(1, hc, hc, hc, subdomain_size_x, subdomain_size_y) 
+            self.mlp_combine = MLP(2 * hc, hc, hc, n_layers=1, n_dim=2)
 
     def _apply_op(self, *args, **kwargs):
         raise NotImplementedError
 
-    def forward(self, t, global_xlim, global_ylim):
+    def _apply_coarse_op(self, t, h):
+        c = self.c(t, self.domain_size_x, self.domain_size_y)
+        h = torch.cat((h, c), dim=1)
+        h = self.mlp_combine(h)
+        return h
+
+    def forward(self, t):
         # t should be laid out [batch, channel, y, x]
         assert t.dim() == 4
 
-        if self.op_xlim == global_xlim and self.op_ylim == global_ylim:
+        if (self.subdomain_size_x == self.domain_size_x and
+            self.subdomain_size_y == self.domain_size_y):
             return self.layer(t)
 
         x_idx, y_idx, res_per_x, res_per_y = get_subdomain_indices(
                 self.overlap,
                 t.size(3),
                 t.size(2),
-                self.op_xlim,
-                self.op_ylim,
-                global_xlim,
-                global_ylim)
+                self.domain_size_x,
+                self.domain_size_y,
+                self.subdomain_size_x,
+                self.subdomain_size_y)
 
-        return self._apply_op(t, x_idx, y_idx, res_per_x, res_per_y, global_xlim, global_ylim)
+        h = self._apply_op(t, x_idx, y_idx, res_per_x, res_per_y)
+        if self.use_coarse_op:
+            h = self._apply_coarse_op(t, h)
+        return h

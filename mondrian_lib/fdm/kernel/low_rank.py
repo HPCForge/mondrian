@@ -13,8 +13,6 @@ class LowRankKernel(nn.Module):
         self.out_size = out_size
         self.rank = rank
 
-        hidden_size = 32
-
         self.psi = nn.Sequential(
                 nn.Linear(2, hidden_size),
                 nn.GELU(),
@@ -42,10 +40,10 @@ class LowRankKernel(nn.Module):
         x_res = v.size(3)
         y_res = v.size(2)
 
-        # Just use [0-1], since we can assume arbitrary coord system
+        # Just use [-1, 1], since we can assume arbitrary coord system
         x_coords, y_coords = torch.meshgrid(
-                torch.linspace(0, 1, x_res, device=v.device),
-                torch.linspace(0, 1, y_res, device=v.device),
+                torch.linspace(-1, 1, x_res, device=v.device),
+                torch.linspace(-1, 1, y_res, device=v.device),
                 indexing='xy')
 
         # Currently assume uniform discretization

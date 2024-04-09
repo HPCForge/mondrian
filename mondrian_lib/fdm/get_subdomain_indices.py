@@ -3,17 +3,17 @@ import torch
 def get_subdomain_indices(overlap,
                           x_res,
                           y_res,
-                          op_xlim,
-                          op_ylim,
-                          global_xlim,
-                          global_ylim):
-    # get the resolution per [1,1] box
-    res_per_global_x = x_res / global_xlim
-    res_per_global_y = y_res / global_ylim
+                          domain_size_x,
+                          domain_size_y,
+                          subdomain_size_x,
+                          subdomain_size_y):
+    # get the resolution per 1x1 box
+    res_per_global_x = x_res / domain_size_x
+    res_per_global_y = y_res / domain_size_y
 
     # get the resolution of each subdomain
-    res_per_x = int(op_xlim * res_per_global_x)
-    res_per_y = int(op_ylim * res_per_global_y)
+    res_per_x = int(subdomain_size_x * res_per_global_x)
+    res_per_y = int(subdomain_size_y * res_per_global_y)
     
     # get the stride of subdomains
     subdomain_step_x = int((1 - overlap) * res_per_x)

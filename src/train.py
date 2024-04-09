@@ -5,6 +5,7 @@ import torch
 from torch.utils.data import DataLoader
 
 import lightning as L
+from lightning.pytorch.callbacks import ModelCheckpoint
 
 from mondrian_lib.data.bubbleml_dataset import BubbleMLDataset
 from mondrian_lib.data.shear_layer_dataset import ShearLayerDataset
@@ -34,8 +35,16 @@ def main(cfg):
     total_iters = len(train_loader) * int(cfg.experiment.train_cfg.max_epochs)
     module = ShearLayerModule(model, total_iters)
 
-    # train
-    trainer = L.Trainer()
+    # setup callbacks
+    checkpoint_callback = ModelCheckpoint(
+            save_top_k=1,
+            save_last=True,
+            monitor='Val/L2Error',
+            mode='min')
+    callbacks = [checkpoint_callback]
+
+    # run training
+    trainer = L.Trainer(callbacks=callbacks)
     trainer.fit(module, train_loader, test_loader)
 
 def get_datasets(cfg, dtype):
@@ -44,7 +53,7 @@ def get_datasets(cfg, dtype):
         train_dataset = BubbleMLDataset(cfg.experiment.train_path, style='train', dtype=dtype)
         test_dataset = BubbleMLDataset(cfg.experiment.test_path, style='test', dtype=dtype)
     elif cfg.experiment.name == 'shear_layer':
-        train_dataset = ShearLayerDataset(cfg.experiment.data_path, which='training', s=128)
+        train_dataset = ShearLayerDataset(cfg.experiment.data_path, which='training', s=64)
         val_dataset = ShearLayerDataset(cfg.experiment.data_path, which='validation', s=128)
         test_dataset = ShearLayerDataset(cfg.experiment.data_path, which='test', s=128)
     elif cfg.experiment.name == 'allen_cahn':
@@ -53,15 +62,11 @@ def get_datasets(cfg, dtype):
 
 def get_dataloaders(train_dataset, test_dataset, cfg):
     batch_size = cfg.experiment.train_cfg.batch_size
-    if cfg.experiment.name == 'bubbleml':
+    exp = ('bubbleml', 'shear_layer', 'allen_cahn')
+    if cfg.experiment.name in exp:
+        # TODO: add val loader when bubbleml ready
         train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
         test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
-    elif cfg.experiment.name == 'shear_layer':
-        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=0)
-        #val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=0)
-        test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=0)
-    elif cfg.experiment.name == 'allen_cahn':
-        pass
     return train_loader, test_loader
 
 if __name__ == '__main__':

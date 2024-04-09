@@ -40,15 +40,11 @@ class CoarseOpCNN(nn.Module):
         res_per_x = x_res / global_xlim
         res_per_y = y_res / global_ylim
 
-        sample_stride = 8
+        # TODO: need to be careful...
+        # Model is very sensitive to stride at different resolutions
+        sample_stride = int((res_per_x / 64) * 16)
+
         h = t[:, :, ::sample_stride, ::sample_stride]
         h = self.conv(h)
 
         return F.interpolate(h, size=t.size()[-2:], mode='bilinear')
-        
-        # TODO: writing back into solution is probably bad!
-        #tp = t.clone()
-        #tp = torch.zeros_like(t)
-        #tp[:, :, ::sample_stride, ::sample_stride] = h
-
-        #return tp
