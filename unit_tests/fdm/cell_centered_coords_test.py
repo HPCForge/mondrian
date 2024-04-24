@@ -1,4 +1,4 @@
-from mondrian_lib.models.fdm.cell_centered_coords import cell_centered_meshgrid
+from mondrian_lib.fdm.cell_centered_coords import cell_centered_meshgrid
 import torch
 
 def test_cell_centered_meshgrid():

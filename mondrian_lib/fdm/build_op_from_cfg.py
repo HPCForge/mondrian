@@ -1,5 +1,6 @@
 from mondrian_lib.fdm.dd_op import DDOpAdditive
 from mondrian_lib.fdm.kernel import (
+    FullRankLinearKernel,
     LowRankKernel,
     LowRankLinearKernel,
     NystromNonLinearKernel,
@@ -12,10 +13,12 @@ _OP_TYPES = [
     _DD_OP_ADDITIVE
 ]
 
+_FULL_RANK_LINEAR_KERNEL = 'full_rank_linear'
 _LOW_RANK_KERNEL = 'low_rank'
 _LOW_RANK_LINEAR_KERNEL = 'low_rank_linear'
 
 _KERNEL_TYPES = [
+    _FULL_RANK_LINEAR_KERNEL,
     _LOW_RANK_KERNEL,
     _LOW_RANK_LINEAR_KERNEL
 ]
@@ -33,7 +36,12 @@ def build_op_from_cfg(op_cfg,
     assert op_cfg.op_name in _OP_TYPES
     assert op_cfg.kernel_name in _KERNEL_TYPES
 
-    if op_cfg.kernel_name == _LOW_RANK_KERNEL:
+    if op_cfg.kernel_name == _FULL_RANK_LINEAR_KERNEL:
+        kernel = FullRankLinearKernel(in_channels,
+                                      out_channels,
+                                      hidden_channels,
+                                      num_filters=op_cfg.num_filters)
+    elif op_cfg.kernel_name == _LOW_RANK_KERNEL:
         kernel = LowRankKernel(in_channels,
                                out_channels,
                                hidden_channels,

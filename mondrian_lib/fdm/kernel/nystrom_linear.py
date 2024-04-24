@@ -35,8 +35,8 @@ class NystromLinearKernel(nn.Module):
 
         # Just use [0-1], since we can assume arbitrary coord system
         x_coords, y_coords = torch.meshgrid(
-                torch.linspace(0, 1, x_res, device=v.device),
-                torch.linspace(0, 1, y_res, device=v.device),
+                torch.linspace(-1, 1, x_res, device=v.device),
+                torch.linspace(-1, 1, y_res, device=v.device),
                 indexing='xy')
 
         # [y_res, x_res, 2]
@@ -66,18 +66,3 @@ class NystromLinearKernel(nn.Module):
         # [batch, out_channels, J, J']
         u = torch.einsum('rsoi,bsi->bors', weight, sample_vp).sum(-1)
         return u.reshape(batch_size, self.out_channels, y_res, x_res)
-
-
-
-        # [batch, J, J', in_channels]
-        #sample_vp = sample_vp.unsqueeze(1).repeat(1, J, 1, 1)
-
-        # [batch, J, J', 2 + in_channels]
-        #inp = torch.cat((diff, sample_vp), dim=-1)
-
-        # [batch, J, out_channels]
-        #up = self.mlp(inp).sum(dim=2) / self.sample_size
-        # [batch, y_res, x_res, out_channels]
-        #up = up.reshape(batch_size, y_res, x_res, self.out_channels)
-        #return up.permute(0, 3, 1, 2)
-

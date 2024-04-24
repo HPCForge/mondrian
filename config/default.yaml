@@ -1,6 +1,6 @@
 log_dir:
 
-model_checkpoint:
+model_ckpt_path:
 
 defaults:
   - _self_

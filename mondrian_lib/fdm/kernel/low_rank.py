@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 from neuralop.layers.mlp import MLP
 
+from mondrian_lib.fdm.integral import integral_2d
+
 class LowRankKernel(nn.Module):
     def __init__(self,
                  in_size,
@@ -27,7 +29,7 @@ class LowRankKernel(nn.Module):
                 nn.GELU(),
                 nn.Linear(hidden_size, self.rank * self.out_size))
 
-    def forward(self, v):
+    def forward(self, v, x):
         r"""
         Integral kernel operator. For each coordinate, m we evaluate the
         operator to all discretization points of v.
@@ -41,16 +43,13 @@ class LowRankKernel(nn.Module):
         y_res = v.size(2)
 
         # Just use [-1, 1], since we can assume arbitrary coord system
-        x_coords, y_coords = torch.meshgrid(
-                torch.linspace(-1, 1, x_res, device=v.device),
-                torch.linspace(-1, 1, y_res, device=v.device),
-                indexing='xy')
-
-        # Currently assume uniform discretization
-        delta_x = x_coords[0, 1] - x_coords[0, 0]
+        #x_coords, y_coords = torch.meshgrid(
+        #        torch.linspace(-1, 1, x_res, device=v.device),
+        #        torch.linspace(-1, 1, y_res, device=v.device),
+        #        indexing='xy')
 
         # [H, W, 2]
-        x = torch.stack((x_coords, y_coords), dim=-1)
+        #x = torch.stack((x_coords, y_coords), dim=-1)
 
         # [H, W, rank, in_size]
         psi = self.psi(x).reshape((y_res, x_res, self.rank, self.in_size))
@@ -58,12 +57,18 @@ class LowRankKernel(nn.Module):
         # [H, W, rank, out_size]
         phi = self.phi(x).reshape((y_res, x_res, self.rank, self.out_size))
 
-        # [batch, H, W, 1, n]
-        vp = v.permute(0, 2, 3, 1).unsqueeze(3)
-        # [batch, H, W, r, 1]
-        dot = (vp * psi * delta_x).sum(-1).unsqueeze(-1)
+        # [batch, H, W, in_size]
+        vp = v.permute(0, 2, 3, 1)
 
-        # [batch, H, W, m]  
-        u = (dot * phi).sum(3)
+        # compute inner products for each x
+        inner = torch.einsum('hwri,bhwi->bhwr', psi, vp)
+
+        # integrate over inner products
+        # [batch, r]
+        dx = x[0, 1, 0] - x[0, 0, 0]
+        l2_inner = integral_2d(inner, dx=dx, dim1=1, dim2=2)
+
+        u = torch.einsum('br,hwro->bhwo', l2_inner, phi)
+
         # [batch, m, H, W]  
         return u.permute(0, 3, 1, 2)

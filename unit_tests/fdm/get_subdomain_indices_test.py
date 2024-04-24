@@ -1,5 +1,5 @@
 import torch
-from mondrian_lib.models.fdm.get_subdomain_indices import get_subdomain_indices
+from mondrian_lib.fdm.get_subdomain_indices import get_subdomain_indices
 
 def test_get_subdomain_indices_1():
     xlim = 2
@@ -9,10 +9,10 @@ def test_get_subdomain_indices_1():
             0.2,
             x_res,
             y_res,
-            op_xlim=0.5,
-            op_ylim=0.5,
-            global_xlim=xlim,
-            global_ylim=ylim)
+            subdomain_size_x=0.5,
+            subdomain_size_y=0.5,
+            domain_size_x=xlim,
+            domain_size_y=ylim)
 
     # the subdomains should overlap
     for i in range(2):

@@ -12,10 +12,10 @@ class WNLinear(nn.Linear):
                          bias=bias,
                          device=device,
                          dtype=dtype)
-        if wnorm:
-            weight_norm(self)
+        #if wnorm:
+        #    weight_norm(self)
 
-        self._fix_weight_norm_deepcopy()
+        #self._fix_weight_norm_deepcopy()
 
     def _fix_weight_norm_deepcopy(self):
         # Fix bug where deepcopy doesn't work with weightnorm.

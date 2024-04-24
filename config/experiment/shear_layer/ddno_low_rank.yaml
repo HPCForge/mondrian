@@ -4,7 +4,7 @@ data_path: '/pub/afeeney/data/data'
 
 train_cfg:
   batch_size: 32
-  max_epochs: 100
+  max_epochs: 50
 
 model_cfg:
   model_name: ddno
@@ -12,12 +12,12 @@ model_cfg:
   layers: 4
   op_cfg:
     op_name: additive
-    kernel_name: low_rank_linear
-    rank: 9
+    kernel_name: low_rank
+    rank: 16
     #num_filters: 4
     # For FDM problems, global domain sizes are hard-coded to 1.0
     subdomain_size_x: 0.25
     subdomain_size_y: 0.25
-    overlap_x: 0.0625
-    overlap_y: 0.0625
+    overlap_x: 0.125
+    overlap_y: 0.125
     use_padding: False

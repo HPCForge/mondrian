@@ -8,5 +8,7 @@ train_cfg:
   max_epochs: 50
 
 model_cfg:
-  model_name: pdebench_unet
-  init_features: 32
+  model_name: ffno
+  modes: 32
+  width: 64
+  layer_norm: True

@@ -1,10 +1,10 @@
-name: shear_layer
+name: disc_transport
 
 data_path: '/pub/afeeney/data/data'
 
 train_cfg:
-  batch_size: 32
-  max_epochs: 100
+  batch_size: 16
+  max_epochs: 50
 
 model_cfg:
   model_name: ddno
@@ -12,7 +12,7 @@ model_cfg:
   layers: 4
   op_cfg:
     op_name: additive
-    kernel_name: low_rank_linear
+    kernel_name: low_rank
     rank: 9
     #num_filters: 4
     # For FDM problems, global domain sizes are hard-coded to 1.0
