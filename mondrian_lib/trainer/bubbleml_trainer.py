@@ -12,7 +12,7 @@ class BubbleMLModule(L.LightningModule):
         self.model = model
         self.embedding = torch.nn.Embedding(
                 num_embeddings=502,
-                embedding_dim=32,
+                embedding_dim=32 * 32,
                 padding_idx=0)
         self.loss_func = loss_func
         self.total_iters = total_iters
@@ -47,17 +47,12 @@ class BubbleMLModule(L.LightningModule):
 
         # hopefully, summing the embeddings preserves enough info.
         # If the embedding dim is large enough resolution, it should...
-        nuc_vec_embedding = nuc_embeddings.sum(1)
-
-        print(nuc_embeddings.size())
-        print(nuc_vec_embedding.size())
-
-        #nuc = nuc_vec_embedding.repeat(1, 1, x.size(2), x.size(3))
-        nuc = einops.repeat(nuc_vec_embedding,
-                            pattern='b c -> b c h w',
-                            b=x.size(0),
-                            h=x.size(2),
-                            w=x.size(3))
+        # [B, 32, 32]
+        nuc_vec_embedding = torch.unflatten(nuc_embeddings.sum(1), dim=1, size=(32, 32))
+        # [B, 1, H, W]
+        nuc = F.interpolate(nuc_vec_embedding.unsqueeze(1),
+                            size=(x.size(2), x.size(3)),
+                            mode='bilinear')
 
         # [B x (C_in + embedding_dim) x H x W]
         input = torch.cat((x, nuc), dim=1)

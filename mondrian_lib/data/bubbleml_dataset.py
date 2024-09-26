@@ -124,8 +124,8 @@ class BubbleMLDataset(Dataset):
 
         # map nuc_sites in [-2.5, 2.5] to a range of indices [1, 501]
         nuc_sites = torch.from_numpy(sim[NUCLEATION_SITES_X][:])
-        assert nuc_sites.min() >= -2.51
-        assert nuc_sites.max() <= 2.51
+        assert nuc_sites.min() >= -2.5
+        assert nuc_sites.max() <= 2.5
         nuc_indices = torch.round(torch.clamp(nuc_sites, -2.5, 2.5) * 100 + 251).to(int)
 
         # append 0s to reach some target length

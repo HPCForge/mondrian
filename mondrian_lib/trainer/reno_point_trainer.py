@@ -11,14 +11,14 @@ import lightning as L
 
 from mondrian_lib.metrics import Metrics
 
-class RENOModule(L.LightningModule):
+class RENOPointModule(L.LightningModule):
     def __init__(self,
                  model,
                  total_iters,
                  lr=0.001,
                  weight_decay=1e-4):
         super().__init__()
-        self.save_hyperparameters()
+        #self.save_hyperparameters()
         self.model = model
         self.total_iters = total_iters
         self.lr = lr
@@ -29,6 +29,9 @@ class RENOModule(L.LightningModule):
         optimizer = torch.optim.AdamW(self.model.parameters(),
                                       lr=self.lr,
                                       weight_decay=self.weight_decay)
+        #scheduler = torch.optim.lr_scheduler.PolynomialLR(
+        #        optimizer,
+        #        total_iters=self.total_iters)
         scheduler = torch.optim.lr_scheduler.OneCycleLR(
                 optimizer,
                 max_lr=self.lr,
@@ -41,19 +44,16 @@ class RENOModule(L.LightningModule):
         return self.model(x)
 
     def training_step(self, batch, batch_idx):
-        x, y = batch
-        pred = self.model(x)
-        loss = self.metrics.log(pred, y, 'Train')
+        pred = self.model(batch)
+        loss = self.metrics.log(pred.x, batch.y, 'Train')
         return loss
 
     def validation_step(self, batch, batch_idx):
-        x, y = batch
-        pred = self.model(x)
-        loss = self.metrics.log(pred, y, 'Val')
+        pred = self.model(batch)
+        loss = self.metrics.log(pred.x, batch.y, 'Val')
         return loss
 
     def test_step(self, batch, batch_idx):
-        x, y = batch
-        pred = self.model(x)
-        loss = self.metrics.log(pred, y, 'Test')
+        pred = self.model(batch)
+        loss = self.metrics.log(pred.x, batch.y, 'Test')
         return loss

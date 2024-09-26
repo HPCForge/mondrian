@@ -78,7 +78,7 @@ class DDNO(nn.Module):
                                   hidden_channels=hidden_channels,
                                   domain_size_x=domain_size_x,
                                   domain_size_y=domain_size_y,
-                                  use_coarse_op=True)
+                                  use_coarse_op=op_cfg.use_coarse_op)
                 for _ in range(self.layers)
             ])
 
@@ -87,7 +87,7 @@ class DDNO(nn.Module):
 
         for i in range(self.layers):
             h = self.ddop[i](x)
-            h = self.norm[i](h)
+            #h = self.norm[i](h)
             h = F.gelu(h)
             x = h + self.skip[i](x)
 

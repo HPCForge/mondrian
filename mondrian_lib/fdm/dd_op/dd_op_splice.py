@@ -4,7 +4,6 @@ from neuralop.layers.padding import DomainPadding
 from neuralop.layers.mlp import MLP
 from mondrian_lib.fdm.dd_op.dd_op_base import DDOpBase
 from mondrian_lib.fdm.cell_centered_coords import cell_centered_meshgrid
-import copy
 
 class DDOpAdditive(DDOpBase):
     def __init__(
@@ -33,11 +32,7 @@ class DDOpAdditive(DDOpBase):
         self.padding = DomainPadding(domain_padding)
         self.use_padding = use_padding
 
-        self.skip = nn.Conv2d(hc, hc, kernel_size=(1, 1))
-
-        #self.conv = nn.ModuleList([
-        #        copy.deepcopy(self.layer) for _ in range(25)
-        #    ])
+        self.skip = nn.Conv2d(hc + 2, hc, kernel_size=(1, 1))
 
     def _apply_op(self, t, col_idx, row_idx, res_per_sub_x, res_per_sub_y):
         col_coords, row_coords = cell_centered_meshgrid(
@@ -45,22 +40,6 @@ class DDOpAdditive(DDOpBase):
                 self.domain_size_y,
                 t.size(3),
                 t.size(2))
-        coords = torch.stack((row_coords, col_coords), dim=0).to(t.device)
-        coords = coords.unsqueeze(0).repeat(t.size(0), 1, 1, 1)
+        #coords = torch.stack((row_coords, col_coords), dim=0).to(t.device)
+        #coords = coords.unsqueeze(0).repeat(t.size(0), 1, 1, 1)
 
-        h = torch.zeros_like(t)
-        mask = torch.zeros_like(t)
-        idx = 0
-        for col in col_idx:
-            for row in row_idx:
-                h_in = t[:,:,row:row+res_per_sub_y,col:col+res_per_sub_x].clone()
-                if self.use_padding:
-                    h_in = self.padding.pad(h_in)
-                h_out = self.layer(h_in)# + self.skip(h_in)
-                idx += 1
-                if self.use_padding:
-                    h_out = self.padding.unpad(h_out)
-                h[:,:,row:row+res_per_sub_y,col:col+res_per_sub_x] += h_out
-                mask[:,:,row:row+res_per_sub_y,col:col+res_per_sub_x] += 1
-        h_damp = h / mask
-        return h_damp

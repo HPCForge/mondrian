@@ -42,7 +42,7 @@ class CoarseOpCNN(nn.Module):
 
         # TODO: need to be careful...
         # Model is very sensitive to stride at different resolutions
-        sample_stride = int((res_per_x / 64) * 16)
+        sample_stride = int((res_per_x / 64) * 8)
 
         h = t[:, :, ::sample_stride, ::sample_stride]
         h = self.conv(h)

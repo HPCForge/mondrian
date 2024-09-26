@@ -2,6 +2,7 @@ from neuralop.models import FNO
 from mondrian_lib.fdm.models.pdebench.unet2d import UNet2d 
 from mondrian_lib.fdm.models.ffno.ffno import FNOFactorized2DBlock
 from mondrian_lib.fdm.models.ddno.ddno import DDNO
+from mondrian_lib.fdm.models.ddno.ddno_ref import DDNORef
 
 _UNET_BENCH = 'pdebench_unet'
 
@@ -9,6 +10,7 @@ _FNO = 'fno'
 _FFNO = 'ffno'
 
 _DDNO = 'ddno'
+_DDNO_REF = 'ddno_ref'
 
 _MODEL_LIST = [
     _UNET_BENCH,
@@ -16,7 +18,8 @@ _MODEL_LIST = [
     _FNO,
     _FFNO,
 
-    _DDNO
+    _DDNO,
+    _DDNO_REF
 ]
 
 def get_model(in_channels, out_channels, model_cfg, device):
@@ -47,5 +50,12 @@ def get_model(in_channels, out_channels, model_cfg, device):
                      domain_size_x=1,
                      domain_size_y=1,
                      op_cfg=model_cfg.op_cfg)
+    elif model_name == _DDNO_REF:
+        model = DDNORef(in_channels=in_channels,
+                     out_channels=out_channels,
+                     hidden_channels=model_cfg.hidden_channels,
+                     layers=model_cfg.layers,
+                     n_subdomain_x=4,
+                     n_subdomain_y=4)
 
     return model.to(device).float()

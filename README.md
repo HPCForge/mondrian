@@ -1,6 +1,5 @@
 # Domain Decomposed Neural Operator
 
-
 ## Running Code:
 
 ### Environment Setup

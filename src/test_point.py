@@ -10,6 +10,7 @@ from mondrian_lib.data.bubbleml_dataset import BubbleMLDataset
 from mondrian_lib.data.shear_layer_dataset import ShearLayerDataset
 from mondrian_lib.data.disc_transport_dataset import DiscTransportDataset
 from mondrian_lib.data.poisson_dataset import PoissonDataset
+from mondrian_lib.data.point_dataset import PointDataset
 from mondrian_lib.trainer.bubbleml_trainer import BubbleMLModule
 from mondrian_lib.trainer.reno_trainer import RENOModule
 
@@ -35,12 +36,10 @@ def main(cfg):
     # run a second time to save outputs
     accum = {'Input': [], 'Label': [], 'Pred': []} 
     for batch in test_loader:
-        input = batch[0]
-        label = batch[-1]
-        pred = module(input).detach().cpu()
-        accum['Input'].append(input)
-        accum['Label'].append(label)
-        accum['Pred'].append(pred)
+        pred = module(batch).detach().cpu()
+        accum['Input'].append(batch.x)
+        accum['Label'].append(batch.y)
+        accum['Pred'].append(pred.x)
 
     prefix = cfg.model_ckpt_path[:-len('.ckpt')]
     pathlib.Path(prefix).mkdir(parents=True, exist_ok=True)
@@ -63,6 +62,9 @@ def get_datasets(cfg, dtype):
         test_dataset = DiscTransportDataset(cfg.experiment.data_path, which='test')
     elif cfg.experiment.name == 'poisson':
         test_dataset = PoissonDataset(cfg.experiment.data_path, which='test')
+
+    test_dataset = PointDataset(test_dataset)
+
     return test_dataset
 
 def get_dataloaders(test_dataset, cfg):

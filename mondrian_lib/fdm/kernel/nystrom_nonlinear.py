@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from neuralop.layers.mlp import MLP
+import einops
 
 class NystromNonLinearKernel(nn.Module):
     def __init__(self,
@@ -14,11 +15,25 @@ class NystromNonLinearKernel(nn.Module):
         self.out_channels = out_channels
         self.hidden_channels = hidden_channels
         self.sample_size = sample_size
+        self.n_dim = 2
 
-        self.mlp = nn.Sequential(
-            nn.Linear(self.in_channels + 2, self.hidden_channels),
+        self.grid = torch.empty((self.sample_size, self.sample_size, 2))
+        self.grid.uniform_(-1, 1)
+        # TODO: check what this is doing :-)
+        self.grid, _ = self.grid.sort(dim=1)
+        self.grid, _ = self.grid.sort(dim=2)
+
+        #self.kernel = MLP(
+        #    in_channels=self.n_dim,
+        #    out_channels=self.in_channels * self.out_channels,
+        #    hidden_channels=self.hidden_channels * 2,
+        #    n_layers=self.n_dim,
+        #    n_dim=self.n_dim,
+        #)
+        self.kernel = nn.Sequential(
+            nn.Linear(self.n_dim, hidden_channels),
             nn.GELU(),
-            nn.Linear(self.hidden_channels, self.out_channels)
+            nn.Linear(hidden_channels, self.in_channels * self.out_channels)
         )
 
     def forward(self, v):
@@ -31,47 +46,36 @@ class NystromNonLinearKernel(nn.Module):
             u: discretized function [batch, out_size, H, W]
         """
         assert v.dim() == 4
+        self.grid = self.grid.to(v.device)
 
         batch_size = v.size(0)
         x_res = v.size(3)
         y_res = v.size(2)
         J = x_res * y_res
 
-        # Just use [0-1], since we can assume arbitrary coord system
-        x_coords, y_coords = torch.meshgrid(
-                torch.linspace(0, 1, x_res, device=v.device),
-                torch.linspace(0, 1, y_res, device=v.device),
-                indexing='xy')
+        row_indices = torch.randperm(J)[:self.sample_size]
+        col_indices = torch.randperm(J)[:self.sample_size]
 
-        # [J, 2]
-        coords = torch.stack((x_coords, y_coords), dim=-1).reshape((-1, 2))
-        # [batch, J, in_channels]
-        vp = v.permute(0, 2, 3, 1).reshape(v.size(0), J, self.in_channels)
+        #x_coords, y_coords = torch.meshgrid(
+        #        torch.linspace(-1, 1, x_res, device=v.device),
+        #        torch.linspace(-1, 1, y_res, device=v.device),
+        #        indexing='xy')
 
-        # select a random sample
-        indices = torch.randperm(J)[:self.sample_size]
+        # [H, W, 2]
+        #coords = torch.stack((x_coords, y_coords), dim=-1)
+
+        # [H, W, 1, 1, 2]
+        grid_tgt = self.grid.unsqueeze(2).unsqueeze(2)
         
-        # [J', 2]
-        sample_coords = coords[indices]
-        # [batch, J', in_size]
-        sample_vp = vp[:, indices]
-        
-        # [J, J', 2]
-        x = coords.unsqueeze(1).repeat(1, self.sample_size, 1)
-        y = sample_coords.unsqueeze(0).repeat(J, 1, 1)
+        # [H, W, H_sample, W_sample, 2]
+        diff = self.grid - grid_tgt 
 
-        # [batch, J, J', 2]
-        diff = (x - y).unsqueeze(0).repeat(batch_size, 1, 1, 1)
+        # [B, H_sample, H_sample, 2]
+        sample_grid = self.grid.unsqueeze(0).repeat(batch_size, 1, 1, 1)
+        # [B, in_size, H_sample, W_sample]
+        sample = F.grid_sample(v, sample_grid)
 
-        # [batch, J, J', in_channels]
-        sample_vp = sample_vp.unsqueeze(1).repeat(1, J, 1, 1)
+        m = self.kernel(diff).unflatten(dim=-1, sizes=(self.out_channels, self.in_channels))
+        out = einops.einsum(m, sample, 'h1 h2 h3 h4 m n, b n h3 h4 -> b n h1 h2') / self.sample_size
 
-        # [batch, J, J', 2 + in_channels]
-        inp = torch.cat((diff, sample_vp), dim=-1)
-
-        # [batch, J, out_channels]
-        up = self.mlp(inp).sum(dim=2) / self.sample_size
-        # [batch, y_res, x_res, out_channels]
-        up = up.reshape(batch_size, y_res, x_res, self.out_channels)
-        return up.permute(0, 3, 1, 2)
-
+        return F.interpolate(out, size=(y_res, x_res), mode='bilinear') 

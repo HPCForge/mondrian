@@ -15,15 +15,8 @@ class NonLinearKernel(nn.Module):
 
         hidden_size = 64
 
-        self.psi = nn.Sequential(
+        self.net = nn.Sequential(
                 nn.Linear(2, hidden_size),
-                nn.GELU(),
-                nn.Linear(hidden_size, hidden_size),
-                nn.GELU(),
-                nn.Linear(hidden_size, self.rank * self.out_size))
-
-        self.phi = nn.Sequential(
-                nn.Linear(2 + self.in_size, hidden_size),
                 nn.GELU(),
                 nn.Linear(hidden_size, hidden_size),
                 nn.GELU(),
@@ -50,7 +43,6 @@ class NonLinearKernel(nn.Module):
 
         # Currently assume uniform discretization
         delta_x = x_coords[0, 1] - x_coords[0, 0]
-
         # [H, W, 2]
         x = torch.stack((x_coords, y_coords), dim=-1)
 

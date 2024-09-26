@@ -4,9 +4,10 @@ import matplotlib.pyplot as plt
 import h5py
 from dataclasses import dataclass
 from mondrian_lib.fdm_boundary_util import BoundaryCondition
-from mondrian_lib.fdm_data_util import darcy_coeff
+from mondrian_lib.fdm_data_util import allen_cahn_coeff
 from typing import Callable
 import numba as nb
+import multiprocessing
 
 class DampedKuramotoSivashinskyPDE(pde.PDEBase):
     r""" 
@@ -70,8 +71,8 @@ class DampedKuramotoSivashinskyPDE(pde.PDEBase):
             # which is negative.
             result += nu_value * laplace2(result, args={"t": t})
             result -= alpha_value * state_data
-            #result -= 0.5 * gradient_sq(state_data, args={"t": t})
             # Lots of people write it -0.5 * grad_sq, but damped people don't
+            #result -= 0.5 * gradient_sq(state_data, args={"t": t})
             result += gradient_sq(state_data, args={"t": t})
             return result
 
@@ -84,38 +85,67 @@ def solve_kuramoto_sivashinsky(xlim, ylim):
     cols = int(xlim * 32)
     # The unit-grid scales with the resolution. So that each cell has "length" 1
     grid = pde.UnitGrid((rows, cols))
-    state = pde.ScalarField.random_uniform(grid)
+    
+    
+    field_dim = max(rows, cols)
+    box_size = max(xlim, ylim)
+    coeff = allen_cahn_coeff(field_dim, box_size)
+    state_data = coeff[:rows, :cols]
+    state = pde.ScalarField(grid, data=state_data)
+    #state = pde.ScalarField.random_uniform(grid)
 
     nu = 1
-    alpha = 0.1
+    alpha = 0.17
     eq = DampedKuramotoSivashinskyPDE(nu, alpha)
     storage = pde.MemoryStorage()
-    tracker=['progress', storage.tracker(1)]
-    result = eq.solve(state, t_range=50, dt=1e-3, scheme='rk', tracker=tracker)
+    tracker=['progress', storage.tracker(2)]
+    result = eq.solve(state, t_range=60, dt=1e-3, scheme='rk', tracker=tracker)
 
     return nu, alpha, storage
 
-dataset_size = 1
-with h5py.File('./kuramoto_sivashinsky.hdf5', 'w') as f:
-    zfill_cnt = len(str(dataset_size))
-    domain_sizes = [8]
-    for domain_size in domain_sizes:
-        size_group = f.create_group(f'{domain_size}_{domain_size}')
-        for i in range(dataset_size):
-            xlim, ylim = domain_size, domain_size
-            nu, alpha, storage = solve_kuramoto_sivashinsky(xlim, ylim)
-            solution = np.stack([s.data for s in storage]) 
+class Solver():
+    def __init__(self, xlim, ylim):
+        self.xlim = xlim
+        self.ylim = ylim
 
-            for j in range(solution.shape[0]):
-                sol = solution[j]
-                print(sol.min(), sol.max())
-                plt.imshow(sol - sol.mean(), cmap='turbo')
-                jfill = str(j).zfill(3)
-                plt.savefig(f'ks{jfill}.png')
+    def __call__(self, i):
+        nu, alpha, storage = solve_kuramoto_sivashinsky(self.xlim, self.ylim)
+        solution = np.stack([s.data for s in storage]) 
+        return nu, alpha, solution, self.xlim, self.ylim
 
-            g = size_group.create_group(str(i).zfill(zfill_cnt))
-            g.create_dataset('solution', data=solution)
-            g.attrs['nu'] = nu
-            g.attrs['alpha'] = alpha
-            g.attrs['xlim'] = xlim
-            g.attrs['ylim'] = ylim
+if __name__ == '__main__':
+    multiprocessing.set_start_method('spawn')
+    dataset_size = 1
+    max_lim = 5
+    domain_sizes = [
+        #(2, 2),
+        #(3, 3),
+        (4, 4)
+        #(xlim, ylim)
+        #for ylim in range(2, max_lim)
+        #for xlim in range(ylim, max_lim)
+    ]
+    dataset_size = 1000
+
+    with h5py.File('./kuramoto_sivashinsky.hdf5', 'w') as f:
+        zfill_cnt = len(str(dataset_size))
+        for xlim, ylim in domain_sizes:
+            size_group = f.create_group(f'{xlim}_{ylim}')
+            processes = min(30, dataset_size)
+            with multiprocessing.Pool(processes=processes) as pool:
+                output = pool.map(Solver(xlim, ylim), range(dataset_size))
+            for i, (nu, alpha, solution, xlim, ylim) in enumerate(output):
+                g = size_group.create_group(str(i).zfill(zfill_cnt))
+                g.create_dataset('solution', data=solution)
+                g.attrs['nu'] = nu
+                g.attrs['alpha'] = alpha
+                g.attrs['xlim'] = xlim
+                g.attrs['ylim'] = ylim
+
+                #for j in range(solution.shape[0]):
+                #    sol = solution[j]
+                #    print(sol.min(), sol.max())
+                #    plt.imshow(sol - sol.mean(), cmap='turbo')
+                #    jfill = str(j).zfill(3)
+                #    plt.savefig(f'ks{jfill}.png')
+

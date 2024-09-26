@@ -29,7 +29,7 @@ class LowRankKernel(nn.Module):
                 #nn.GELU(),
                 nn.Linear(256, self.rank * self.out_size))
 
-    def forward(self, v):
+    def forward(self, v, coords):
         r"""
         Integral kernel operator. For each coordinate, m we evaluate the
         operator to all discretization points of v.
@@ -43,13 +43,13 @@ class LowRankKernel(nn.Module):
         y_res = v.size(2)
 
         # Just use [-1, 1], since we can assume arbitrary coord system
-        x_coords, y_coords = torch.meshgrid(
-                torch.linspace(-1, 1, x_res, device=v.device),
-                torch.linspace(-1, 1, y_res, device=v.device),
-                indexing='xy')
+        #x_coords, y_coords = torch.meshgrid(
+        #        torch.linspace(-1, 1, x_res, device=v.device),
+        #        torch.linspace(-1, 1, y_res, device=v.device),
+        #        indexing='xy')
 
         # [H, W, 2]
-        coords = torch.stack((x_coords, y_coords), dim=-1)
+        #x = torch.stack((x_coords, y_coords), dim=-1)
 
         # [H, W, rank, in_size]
         psi = self.psi(coords).reshape((y_res, x_res, self.rank, self.in_size))
@@ -66,7 +66,7 @@ class LowRankKernel(nn.Module):
         # integrate over inner products
         # [batch, r]
         dx = coords[0, 1, 0] - coords[0, 0, 0]
-        l2_inner = integral_2d(inner, dx=1, dim1=1, dim2=2)
+        l2_inner = integral_2d(inner, dx=dx, dim1=1, dim2=2)
 
         u = torch.einsum('br,hwro->bhwo', l2_inner, phi)
 

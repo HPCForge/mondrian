@@ -3,7 +3,6 @@ Taken and modified from Factorized FNO
 https://github.com/alasdairtran/fourierflow/
 """
 
-
 import torch
 import torch.nn as nn
 from einops import rearrange
@@ -13,13 +12,26 @@ from .linear import WNLinear
 
 
 class SpectralConv2d(nn.Module):
-    def __init__(self, in_dim, out_dim, n_modes, forecast_ff, backcast_ff,
-                 fourier_weight, factor, ff_weight_norm,
-                 n_ff_layers, layer_norm, use_fork, dropout, mode):
+    def __init__(self,
+                 in_dim,
+                 out_dim,
+                 n_modes,
+                 permute=True,
+                 forecast_ff=None,
+                 backcast_ff=None,
+                 fourier_weight=None,
+                 factor=2,
+                 ff_weight_norm=None,
+                 n_ff_layers=2,
+                 layer_norm=False,
+                 use_fork=False,
+                 dropout=0.0,
+                 mode='full'):
         super().__init__()
         self.in_dim = in_dim
         self.out_dim = out_dim
         self.n_modes = n_modes
+        self.permute=permute
         self.mode = mode
         self.use_fork = use_fork
 
@@ -45,13 +57,16 @@ class SpectralConv2d(nn.Module):
                 out_dim, factor, ff_weight_norm, n_ff_layers, layer_norm, dropout)
 
     def forward(self, x):
+        if self.permute:
+            x = x.permute((0, 2, 3, 1))
         # x.shape == [batch_size, grid_size, grid_size, in_dim]
         if self.mode != 'no-fourier':
             x = self.forward_fourier(x)
 
         b = self.backcast_ff(x)
-        f = self.forecast_ff(x) if self.use_fork else None
-        return b, f
+        if self.permute:
+            b = b.permute((0, 3, 1, 2))
+        return b
 
     def forward_fourier(self, x):
         x = rearrange(x, 'b m n i -> b i m n')
@@ -154,6 +169,7 @@ class FNOFactorized2DBlock(nn.Module):
             self.spectral_layers.append(SpectralConv2d(in_dim=width,
                                                        out_dim=width,
                                                        n_modes=modes,
+                                                       permute=False,
                                                        forecast_ff=self.forecast_ff,
                                                        backcast_ff=self.backcast_ff,
                                                        fourier_weight=self.fourier_weight,
@@ -185,12 +201,12 @@ class FNOFactorized2DBlock(nn.Module):
         forecast_list = []
         for i in range(self.n_layers):
             layer = self.spectral_layers[i]
-            b, f = layer(x)
+            b = layer(x)
 
-            if self.use_fork:
-                f_out = self.out(f)
-                forecast = forecast + f_out
-                forecast_list.append(f_out)
+            #if self.use_fork:
+            #    f_out = self.out(f)
+            #    forecast = forecast + f_out
+            #    forecast_list.append(f_out)
 
             x = x + b
 
