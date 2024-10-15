@@ -1,4 +1,4 @@
-name: neural-schwarz-test
+name: mondrian
 channels:
   - numba
   - pytorch
@@ -6,7 +6,7 @@ channels:
   - pyg
 dependencies:
   - python=3.9
-  - pytorch=2.0.1
+  - pytorch=2.4.1
   - pytorch-cuda=11.7
   - torchvision
   - pyg
@@ -19,7 +19,7 @@ dependencies:
   - pip:
     - hydra-core
     - lightning
-    - neuraloperator=0.3.0
+    - neuraloperator==0.3.0
     - opencv-python
     - matplotlib
     - tensorboard
