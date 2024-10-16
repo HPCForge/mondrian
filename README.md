@@ -12,7 +12,7 @@ conda activate mondrian
 Next, you need to install the utility library, `mondrian_lib`:
 
 ```console
-pip install -e .
+python -m pip install --editable .
 ```
 
 ### Training
