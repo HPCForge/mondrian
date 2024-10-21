@@ -5,9 +5,7 @@ from torch.utils.data import Dataset
 
 class PointDataset(Dataset):
     r"""
-    Converts a grid/FDM dataset into a point cloud.
-    This just uses a square grid of coordinates, since
-    it's assuming a fixed geometry.
+    Converts an existing dataset to its point-wise evaluation
     """
     def __init__(self, dataset):
         self.dataset = dataset
@@ -40,5 +38,9 @@ class PointDataset(Dataset):
         data = Data(x=input,
                     y=label,
                     pos=c)
+                    #src_coords=c,
+                    #tgt_coords=c)
 
-        return data        
+        return data
+
+        

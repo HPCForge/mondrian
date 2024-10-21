@@ -13,17 +13,10 @@ from lightning.pytorch.callbacks import (
 # TODO: tidy up data loading stuff
 from torch_geometric.data import DataLoader as PyGDataLoader
 
-from mondrian_lib.data.bubbleml_dataset import BubbleMLDataset
-from mondrian_lib.data.shear_layer_dataset import ShearLayerDataset
-from mondrian_lib.data.disc_transport_dataset import DiscTransportDataset
-from mondrian_lib.data.poisson_dataset import PoissonDataset
+from mondrian.data.shear_layer_dataset import ShearLayerDataset
 from mondrian_lib.data.point_dataset import PointDataset
 from mondrian_lib.fdm.models.get_model import get_model
-from mondrian_lib.trainer.bubbleml_trainer import BubbleMLModule
-from mondrian_lib.trainer.reno_trainer import RENOModule
 from mondrian_lib.trainer.reno_point_trainer import RENOPointModule
-from mondrian_lib.dd_operator import DDNO
-from mondrian_lib.dd_unet import DDGraphUNet
 
 @hydra.main(version_base=None, config_path='../config', config_name='default')
 def main(cfg):
@@ -45,15 +38,6 @@ def main(cfg):
     out_channels = train_dataset.out_channels
 
     #model = get_model(in_channels, out_channels, cfg.experiment.model_cfg, device)
-    #model = DDNO(in_channels,
-    #             out_channels,
-    #             hidden_channels=32,
-    #     )
-
-    model = DDGraphUNet(in_channels=in_channels,
-                        hidden_channels=64,
-                        out_channels=out_channels,
-                        subdomain_size=[(32, 32), (16, 16), (8, 8)])
 
     # setup lightning module
     max_epochs = int(cfg.experiment.train_cfg.max_epochs)
@@ -97,14 +81,6 @@ def get_datasets(cfg, dtype):
         train_dataset = ShearLayerDataset(cfg.experiment.data_path, which='training', s=64)
         val_dataset = ShearLayerDataset(cfg.experiment.data_path, which='validation', s=64)
         test_dataset = ShearLayerDataset(cfg.experiment.data_path, which='test', s=128)
-    elif cfg.experiment.name == 'disc_transport':
-        train_dataset = DiscTransportDataset(cfg.experiment.data_path, which='training')
-        val_dataset = DiscTransportDataset(cfg.experiment.data_path, which='validation')
-        test_dataset = DiscTransportDataset(cfg.experiment.data_path, which='test')
-    elif cfg.experiment.name == 'poisson':
-        train_dataset = PoissonDataset(cfg.experiment.data_path, which='training')
-        val_dataset = PoissonDataset(cfg.experiment.data_path, which='validation')
-        test_dataset = PoissonDataset(cfg.experiment.data_path, which='test')
     if cfg.experiment.use_point:
         train_dataset = PointDataset(train_dataset)
         val_dataset = PointDataset(val_dataset)
@@ -115,6 +91,7 @@ def get_dataloaders(train_dataset, val_dataset, cfg):
     batch_size = cfg.experiment.train_cfg.batch_size
     exp = ('bubbleml', 'shear_layer', 'disc_transport', 'poisson')
 
+    # TODO: these should just be in experiment config
     train_workers = 2
     test_workers = 2
     # BubbleML test inputs are huge, so use more workers
