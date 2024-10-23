@@ -1,6 +1,6 @@
 import torch
 
-from mondrian.point_layers.self_attention.self_attention import SelfAttention
+from mondrian.point.self_attention.self_attention import SelfAttention
 
 def test_init():
     sa = SelfAttention(in_channels=32,
