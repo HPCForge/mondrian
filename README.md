@@ -1,7 +1,5 @@
 # Domain Decomposed Neural Operator
 
-## Running Code:
-
 ### Environment Setup
 
 ```console
@@ -15,17 +13,8 @@ Next, you need to install the utility library, `mondrian_lib`:
 python -m pip install --editable .
 ```
 
-### Training
-
-After the environment has been setup, we can run training on the shear
-layer Navier-Stokes problem from [CNO](https://arxiv.org/abs/2302.01178).
-Download and unzip `data.zip` from their [Zenodo](https://zenodo.org/records/10406879).
-
-There are several config files for different experiments in `config/experiment/shear_layer/`.
-To run the training for the Factorized Fourier Neural Operator (FFNO), just run
+To run the `tests/`, execute
 
 ```console
-python src/train.py \
-	experiment=shear_layer/ffno \
-	experiment.data_path=</path/to/unzipped/data/>
+python -m pytest
 ```
