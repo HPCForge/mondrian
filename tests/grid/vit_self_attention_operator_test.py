@@ -15,3 +15,4 @@ def test_vit_sa_forward():
   assert u.size(2) == 32
   assert u.size(3) == 16
   assert u.size(4) == 16
+  assert not u.isnan().any()

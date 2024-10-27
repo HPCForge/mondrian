@@ -20,7 +20,7 @@ class ViTSelfAttentionOperator(nn.Module):
     self.embed_dim = embed_dim
     self.num_heads = num_heads
 
-    modes = (4, 4)
+    modes = (8, 8)
     self.query_operator = SimpleSpectralConv(embed_dim, embed_dim * num_heads, modes)
     self.key_oeprator = SimpleSpectralConv(embed_dim, embed_dim * num_heads, modes)
     self.value_operator = SimpleSpectralConv(embed_dim, embed_dim * num_heads, modes)
@@ -46,7 +46,7 @@ class ViTSelfAttentionOperator(nn.Module):
     query = self.query_operator(seq)
     key = self.key_oeprator(seq)
     value = self.value_operator(seq)
-
+    
     # [batch_size x heads x seq_len x embed_dim x ...]
     query = self._unflatten(query)
     key = self._unflatten(key)
@@ -54,5 +54,5 @@ class ViTSelfAttentionOperator(nn.Module):
     
     sa = self_attention(query, key, value)
     sa = self._flatten(sa)
-        
+    
     return self.output_operator(sa)
