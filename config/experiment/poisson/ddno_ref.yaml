@@ -1,4 +1,4 @@
-name: shear_layer
+name: poisson
 
 data_path: '/pub/afeeney/data/data'
 
@@ -7,6 +7,6 @@ train_cfg:
   max_epochs: 1000
 
 model_cfg:
-  model_name: fno
-  n_modes: [32, 32]
-  hidden_channels: 64
+  model_name: ddno_ref
+  hidden_channels: 32
+  layers: 2

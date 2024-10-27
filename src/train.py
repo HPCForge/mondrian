@@ -10,12 +10,13 @@ from lightning.pytorch.callbacks import (
         EarlyStopping
 )
 
-from mondrian_lib.data.bubbleml_dataset import BubbleMLDataset
-from mondrian_lib.data.shear_layer_dataset import ShearLayerDataset
-from mondrian_lib.data.disc_transport_dataset import DiscTransportDataset
+# TODO: tidy up data loading stuff
+from torch_geometric.data import DataLoader as PyGDataLoader
+
+from mondrian.data.shear_layer_dataset import ShearLayerDataset
+from mondrian_lib.data.point_dataset import PointDataset
 from mondrian_lib.fdm.models.get_model import get_model
-from mondrian_lib.trainer.bubbleml_trainer import BubbleMLModule
-from mondrian_lib.trainer.reno_trainer import RENOModule
+from mondrian_lib.trainer.reno_point_trainer import RENOPointModule
 
 @hydra.main(version_base=None, config_path='../config', config_name='default')
 def main(cfg):
@@ -27,17 +28,16 @@ def main(cfg):
     torch.set_float32_matmul_precision('medium')
 
     # get experiment dataset
-    train_dataset, test_dataset = get_datasets(cfg, dtype)
+    train_dataset, val_dataset = get_datasets(cfg, dtype)
 
     # build experiment dataloaders
-    train_loader, test_loader = get_dataloaders(train_dataset, test_dataset, cfg)
+    train_loader, val_loader = get_dataloaders(train_dataset, val_dataset, cfg)
 
     # get model
     in_channels = train_dataset.in_channels
     out_channels = train_dataset.out_channels
 
-    print(in_channels)
-    model = get_model(in_channels, out_channels, cfg.experiment.model_cfg, device)
+    #model = get_model(in_channels, out_channels, cfg.experiment.model_cfg, device)
 
     # setup lightning module
     max_epochs = int(cfg.experiment.train_cfg.max_epochs)
@@ -52,8 +52,8 @@ def main(cfg):
             mode='min')
     early_stopping_callback = EarlyStopping(
             monitor='Val/L2Error',
-            min_delta=1e-8,
-            patience=10)
+            min_delta=0.0,
+            patience=25)
     callbacks = [
             checkpoint_callback,
             early_stopping_callback
@@ -61,13 +61,15 @@ def main(cfg):
 
     # run training
     trainer = L.Trainer(callbacks=callbacks, max_epochs=max_epochs)
-    trainer.fit(module, train_loader, test_loader)
+    trainer.fit(module, train_loader, val_loader)
 
 def get_module(cfg):
     name = cfg.experiment.name
     if name == 'bubbleml':
         return BubbleMLModule
-    elif name in ('shear_layer', 'disc_transport'):
+    elif name in ('shear_layer', 'disc_transport', 'poisson'):
+        if cfg.experiment.use_point:
+            return RENOPointModule
         return RENOModule
 
 def get_datasets(cfg, dtype):
@@ -77,35 +79,41 @@ def get_datasets(cfg, dtype):
         test_dataset = BubbleMLDataset(cfg.experiment.test_path, style='test', dtype=dtype)
     elif cfg.experiment.name == 'shear_layer':
         train_dataset = ShearLayerDataset(cfg.experiment.data_path, which='training', s=64)
-        val_dataset = ShearLayerDataset(cfg.experiment.data_path, which='validation', s=128)
+        val_dataset = ShearLayerDataset(cfg.experiment.data_path, which='validation', s=64)
         test_dataset = ShearLayerDataset(cfg.experiment.data_path, which='test', s=128)
-    elif cfg.experiment.name == 'disc_transport':
-        train_dataset = DiscTransportDataset(cfg.experiment.data_path, which='training')
-        val_dataset = DiscTransportDataset(cfg.experiment.data_path, which='validation')
-        test_dataset = DiscTransportDataset(cfg.experiment.data_path, which='test')
-    return train_dataset, test_dataset
+    if cfg.experiment.use_point:
+        train_dataset = PointDataset(train_dataset)
+        val_dataset = PointDataset(val_dataset)
+        test_dataset = PointDataset(test_dataset)
+    return train_dataset, val_dataset
 
-def get_dataloaders(train_dataset, test_dataset, cfg):
+def get_dataloaders(train_dataset, val_dataset, cfg):
     batch_size = cfg.experiment.train_cfg.batch_size
-    exp = ('bubbleml', 'shear_layer', 'disc_transport')
+    exp = ('bubbleml', 'shear_layer', 'disc_transport', 'poisson')
 
+    # TODO: these should just be in experiment config
     train_workers = 2
     test_workers = 2
     # BubbleML test inputs are huge, so use more workers
     if exp == 'bubbleml':
         test_workers = 10
+
+    if cfg.experiment.use_point:
+        DL = PyGDataLoader
+    else:
+        DL = DataLoader
     
     if cfg.experiment.name in exp:
         # TODO: add val loader when bubbleml ready
-        train_loader = DataLoader(train_dataset,
+        train_loader = DL(train_dataset,
                                   batch_size=batch_size,
                                   shuffle=True,
                                   num_workers=train_workers)
-        test_loader = DataLoader(test_dataset,
-                                 batch_size=batch_size,
-                                 shuffle=False,
-                                 num_workers=test_workers)
-    return train_loader, test_loader
+        val_loader = DL(val_dataset,
+                                batch_size=batch_size,
+                                shuffle=False,
+                                num_workers=test_workers)
+    return train_loader, val_loader
 
 if __name__ == '__main__':
     main()

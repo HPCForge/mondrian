@@ -1,28 +1,28 @@
-name: shear_layer
+name: poisson
 
 data_path: '/pub/afeeney/data/data'
 
 train_cfg:
-  batch_size: 16
+  batch_size: 32
   max_epochs: 1000
 
 model_cfg:
   model_name: ddno
-  hidden_channels: 32
-  layers: 4
+  hidden_channels: 64
+  layers: 10
   op_cfg:
     op_name: additive
-    kernel_name: nystrom
-    #n_modes: 16
-    sample_size: 9
-    #rank: 8
+    kernel_name: low_rank
+    #n_modes: [16, 16]
+    sample_size: 8
+    rank: 8
     #num_filters: 4
     # For FDM problems, global domain sizes are hard-coded to 1.0
-    subdomain_size_x: 0.05
-    subdomain_size_y: 0.05
+    subdomain_size_x: 0.1 #0.25
+    subdomain_size_y: 0.1 #0.25
     overlap_x: 0.025
     overlap_y: 0.025
     #overlap_x: 0.0625
     #overlap_y: 0.0625
     use_padding: False
-    use_coarse_op: True
+    use_coarse_op: False

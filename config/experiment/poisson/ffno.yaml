@@ -1,6 +1,4 @@
-name: shear_layer
-
-use_point: False
+name: poisson
 
 data_path: '/pub/afeeney/data/data'
 
@@ -10,6 +8,6 @@ train_cfg:
 
 model_cfg:
   model_name: ffno
-  modes: 64
-  width: 32
+  modes: 32
+  width: 64
   layer_norm: True
