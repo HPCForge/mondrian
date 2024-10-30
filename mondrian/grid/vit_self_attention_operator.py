@@ -5,6 +5,7 @@ from torch import nn
 
 from .fast_math import self_attention
 from .spectral_conv import SimpleSpectralConv
+from .log_cpb import LogCPB
 
 class ViTSelfAttentionOperator(nn.Module):
   r"""
@@ -20,11 +21,12 @@ class ViTSelfAttentionOperator(nn.Module):
     self.embed_dim = embed_dim
     self.num_heads = num_heads
 
-    modes = (8, 8)
+    modes = (16, 16)
     self.query_operator = SimpleSpectralConv(embed_dim, embed_dim * num_heads, modes)
     self.key_oeprator = SimpleSpectralConv(embed_dim, embed_dim * num_heads, modes)
     self.value_operator = SimpleSpectralConv(embed_dim, embed_dim * num_heads, modes)
     self.output_operator = SimpleSpectralConv(num_heads * embed_dim, embed_dim, modes)
+    self.log_cpb = LogCPB(embed_dim, num_heads)
 
   def _unflatten(self, f):
     f = torch.unflatten(f, 2, (self.num_heads, self.embed_dim))
@@ -33,9 +35,10 @@ class ViTSelfAttentionOperator(nn.Module):
   def _flatten(self, f):
     # [batch x seq x heads x embed_dim x ...]
     t = torch.transpose(f, 1, 2)
+    # [batch x seq x (heads x embed_dim)]
     return torch.flatten(t, start_dim=2, end_dim=3)
   
-  def forward(self, seq):
+  def forward(self, seq, n_sub_x, n_sub_y):
     r"""
     Args:
       seq: [batch_size x seq_len x embed_dim x ...]
@@ -52,7 +55,9 @@ class ViTSelfAttentionOperator(nn.Module):
     key = self._unflatten(key)
     value = self._unflatten(value)
     
-    sa = self_attention(query, key, value)
+    bias = self.log_cpb(n_sub_x, n_sub_y, device=query.device)
+    
+    sa = self_attention(query, key, value, bias)
     sa = self._flatten(sa)
     
     return self.output_operator(sa)

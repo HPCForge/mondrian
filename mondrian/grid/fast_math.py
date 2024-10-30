@@ -5,7 +5,6 @@ These typically take functions as input, rather than vectors.
 
 import math
 import einops
-
 import torch
 from torch.nn.functional import softmax
 
@@ -35,9 +34,10 @@ def _naive_inner_product_score(u, v, p=2):
   integral = (local_inner_product / numel).sum(dim=dims_to_sum)
   return integral
 
-def self_attention(query, key, value):
+def self_attention(query, key, value, bias=None):
   score = inner_product_score(query, key)
+  if bias is not None:
+    score = score + bias
   probabilities = softmax(score, dim=-1)
-  print(score.size(), probabilities.size())
   return einops.einsum(
     probabilities, value, 'b h s1 s2, b h s2 ... -> b h s1 ...')
