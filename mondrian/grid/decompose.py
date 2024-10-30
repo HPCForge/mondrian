@@ -6,7 +6,7 @@ def decompose2d(v, n_sub_x, n_sub_y):
   Args:
     v: [batch x channels x y-discretization x x-discretization]
     n_sub_x: number of subdomains in the x direction
-    n_sub_y: number of subdomains in the y direction.
+    n_sub_y: number of subdomains in the y direction
   Returns:
     d: [batch x seq x channels x ...]
   """
@@ -36,6 +36,8 @@ def recompose2d(d, n_sub_x, n_sub_y):
   decompose2d.
   Args:
     d: [batch_size x seq x channels x ...]
+    n_sub_x: number of subdomains in the x direction
+    n_sub_y: number of subdomains in the y direction
   Returns: 
     v: [batch_size x channels x ...]
   """
@@ -47,7 +49,7 @@ def recompose2d(d, n_sub_x, n_sub_y):
   kernel_x = d.size(4)
 
   d = torch.unflatten(d, 1, (n_sub_y, n_sub_x))
-  d = d.permute(0, 3, 4, 5, 1, 2)
+  d = d.permute(0, 3, 4, 5, 1, 2).contiguous()
   d = d.view(batch_size, -1, n_sub_y, n_sub_x).contiguous()
   d = d.view(batch_size, channels * kernel_y * kernel_x, -1).contiguous()     
   d = torch.nn.functional.fold(d, 
