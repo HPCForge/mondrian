@@ -13,10 +13,9 @@ from lightning.pytorch.callbacks import (
 # TODO: tidy up data loading stuff
 from torch_geometric.data import DataLoader as PyGDataLoader
 
-from mondrian.data.shear_layer_dataset import ShearLayerDataset
-from mondrian_lib.data.point_dataset import PointDataset
-from mondrian_lib.fdm.models.get_model import get_model
-from mondrian_lib.trainer.reno_point_trainer import RENOPointModule
+from mondrian.models import ViTOperator2d
+from mondrian.dataset.shear_layer_dataset import ShearLayerDataset
+from mondrian.trainer.reno_trainer import RENOModule
 
 @hydra.main(version_base=None, config_path='../config', config_name='default')
 def main(cfg):
@@ -37,7 +36,7 @@ def main(cfg):
     in_channels = train_dataset.in_channels
     out_channels = train_dataset.out_channels
 
-    #model = get_model(in_channels, out_channels, cfg.experiment.model_cfg, device)
+    model = ViTOperator2d(in_channels, out_channels, 16, 4, 4, subdomain_size=(1, 1)).cuda()
 
     # setup lightning module
     max_epochs = int(cfg.experiment.train_cfg.max_epochs)
@@ -65,26 +64,23 @@ def main(cfg):
 
 def get_module(cfg):
     name = cfg.experiment.name
-    if name == 'bubbleml':
-        return BubbleMLModule
-    elif name in ('shear_layer', 'disc_transport', 'poisson'):
-        if cfg.experiment.use_point:
-            return RENOPointModule
-        return RENOModule
+    #if name == 'bubbleml':
+    #    return BubbleMLModule
+    #elif name in ('shear_layer', 'disc_transport', 'poisson'):
+    #    if cfg.experiment.use_point:
+    #        return RENOPointModule
+    return RENOModule
 
 def get_datasets(cfg, dtype):
     if cfg.experiment.name == 'bubbleml':
+        pass
         # TODO: should make a train/val/test split, once I've generated a larger dataset
-        train_dataset = BubbleMLDataset(cfg.experiment.train_path, style='train', dtype=dtype)
-        test_dataset = BubbleMLDataset(cfg.experiment.test_path, style='test', dtype=dtype)
+        #train_dataset = BubbleMLDataset(cfg.experiment.train_path, style='train', dtype=dtype)
+        #test_dataset = BubbleMLDataset(cfg.experiment.test_path, style='test', dtype=dtype)
     elif cfg.experiment.name == 'shear_layer':
-        train_dataset = ShearLayerDataset(cfg.experiment.data_path, which='training', s=64)
-        val_dataset = ShearLayerDataset(cfg.experiment.data_path, which='validation', s=64)
+        train_dataset = ShearLayerDataset(cfg.experiment.data_path, which='training', s=128)
+        val_dataset = ShearLayerDataset(cfg.experiment.data_path, which='validation', s=128)
         test_dataset = ShearLayerDataset(cfg.experiment.data_path, which='test', s=128)
-    if cfg.experiment.use_point:
-        train_dataset = PointDataset(train_dataset)
-        val_dataset = PointDataset(val_dataset)
-        test_dataset = PointDataset(test_dataset)
     return train_dataset, val_dataset
 
 def get_dataloaders(train_dataset, val_dataset, cfg):
@@ -92,8 +88,8 @@ def get_dataloaders(train_dataset, val_dataset, cfg):
     exp = ('bubbleml', 'shear_layer', 'disc_transport', 'poisson')
 
     # TODO: these should just be in experiment config
-    train_workers = 2
-    test_workers = 2
+    train_workers = 4
+    test_workers = 4
     # BubbleML test inputs are huge, so use more workers
     if exp == 'bubbleml':
         test_workers = 10
@@ -106,13 +102,13 @@ def get_dataloaders(train_dataset, val_dataset, cfg):
     if cfg.experiment.name in exp:
         # TODO: add val loader when bubbleml ready
         train_loader = DL(train_dataset,
-                                  batch_size=batch_size,
-                                  shuffle=True,
-                                  num_workers=train_workers)
+                          batch_size=batch_size,
+                          shuffle=True,
+                          num_workers=train_workers)
         val_loader = DL(val_dataset,
-                                batch_size=batch_size,
-                                shuffle=False,
-                                num_workers=test_workers)
+                        batch_size=batch_size,
+                        shuffle=False,
+                        num_workers=test_workers)
     return train_loader, val_loader
 
 if __name__ == '__main__':

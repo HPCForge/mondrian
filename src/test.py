@@ -6,12 +6,8 @@ import torch
 from torch.utils.data import DataLoader
 import lightning as L
 
-from mondrian_lib.data.bubbleml_dataset import BubbleMLDataset
-from mondrian_lib.data.shear_layer_dataset import ShearLayerDataset
-from mondrian_lib.data.disc_transport_dataset import DiscTransportDataset
-from mondrian_lib.data.poisson_dataset import PoissonDataset
-from mondrian_lib.trainer.bubbleml_trainer import BubbleMLModule
-from mondrian_lib.trainer.reno_trainer import RENOModule
+from mondrian.dataset.shear_layer_dataset import ShearLayerDataset
+from mondrian.trainer.reno_trainer import RENOModule
 
 @hydra.main(version_base=None, config_path='../config', config_name='default')
 def main(cfg):
@@ -49,20 +45,20 @@ def main(cfg):
         torch.save(torch.cat(accum[k], dim=0).detach().cpu(), f'{prefix}/{k}.pt')
 
 def get_module(cfg):
-    if cfg.experiment.name == 'bubbleml':
-        return BubbleMLModule
-    else:
-        return RENOModule
+    #if cfg.experiment.name == 'bubbleml':
+    #    return BubbleMLModule
+    #else:
+    return RENOModule
 
 def get_datasets(cfg, dtype):
-    if cfg.experiment.name == 'bubbleml':
-        test_dataset = BubbleMLDataset(cfg.experiment.test_path, style='test', dtype=dtype)
-    elif cfg.experiment.name == 'shear_layer':
-        test_dataset = ShearLayerDataset(cfg.experiment.data_path, which='test', s=128)
-    elif cfg.experiment.name == 'disc_transport':
-        test_dataset = DiscTransportDataset(cfg.experiment.data_path, which='test')
-    elif cfg.experiment.name == 'poisson':
-        test_dataset = PoissonDataset(cfg.experiment.data_path, which='test')
+    #if cfg.experiment.name == 'bubbleml':
+    #    test_dataset = BubbleMLDataset(cfg.experiment.test_path, style='test', dtype=dtype)
+    #elif cfg.experiment.name == 'shear_layer':
+    test_dataset = ShearLayerDataset(cfg.experiment.data_path, which='test', s=128)
+    #elif cfg.experiment.name == 'disc_transport':
+    #    test_dataset = DiscTransportDataset(cfg.experiment.data_path, which='test')
+    #elif cfg.experiment.name == 'poisson':
+    #    test_dataset = PoissonDataset(cfg.experiment.data_path, which='test')
     return test_dataset
 
 def get_dataloaders(test_dataset, cfg):

@@ -14,7 +14,7 @@ def shear_layer_dataloaders(data_path, batch_size):
     return train_loader, val_loader, test_loader
 
 class ShearLayerDataset(Dataset):
-    def __init__(self, data, which="training", nf=0, training_samples = 750, s=64, in_dist = True):
+    def __init__(self, data, which="training", nf=0, training_samples = 750, s=128, in_dist = True):
 
         self.in_channels = 1
         self.out_channels = 1
