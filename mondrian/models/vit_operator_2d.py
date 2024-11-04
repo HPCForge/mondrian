@@ -4,9 +4,10 @@ import torch
 from torch import nn
 
 from mondrian.grid.decompose import decompose2d, recompose2d
-from mondrian.grid.spectral_conv import SimpleSpectralConv
+from mondrian.grid.spectral_conv import SimpleSpectralConv2d
 from mondrian.grid.vit_self_attention_operator import ViTSelfAttentionOperator
 from mondrian.grid.pointwise_linear import PointwiseLinear
+from mondrian.grid.seq_op import seq_op
 
 from neuralop.layers.padding import DomainPadding
 
@@ -20,22 +21,17 @@ class SequenceInstanceNorm2d(nn.Module):
     Flattens the batch and sequence dimension of the input
     `v`, so that it can be passed into a standard instance norm.
     """
-    batch_size = v.size(0)
-    seq_len = v.size(1)
-    v = torch.flatten(v, start_dim=0, end_dim=1)
-    v = self.norm(v)
-    v = torch.unflatten(v, dim=0, sizes=(batch_size, seq_len))
-    return v
+    return seq_op(self.norm, v)
 
-class Embed(nn.Module):
+class Encoder(nn.Module):
   def __init__(self, 
                embed_dim, 
                num_heads):
     super().__init__()
     self.sa = ViTSelfAttentionOperator(embed_dim, num_heads)
-    modes = (16, 16)
-    self.spectral_conv1 = SimpleSpectralConv(embed_dim, embed_dim, modes)
-    self.spectral_conv2 = SimpleSpectralConv(embed_dim, embed_dim, modes)
+    modes = 16
+    self.spectral_conv1 = SimpleSpectralConv2d(embed_dim, embed_dim, modes)
+    self.spectral_conv2 = SimpleSpectralConv2d(embed_dim, embed_dim, modes)
 
     self.norm1 = SequenceInstanceNorm2d(embed_dim)
     self.norm2 = SequenceInstanceNorm2d(embed_dim)
@@ -66,7 +62,7 @@ class ViTOperator2d(nn.Module):
     self.sub_size_x = self.subdomain_size[1]
     
     self.embed = nn.ModuleList([
-      Embed(embed_dim, num_heads) for _ in range(num_layers)
+      Encoder(embed_dim, num_heads) for _ in range(num_layers)
     ])
     
     self.input_project = PointwiseLinear(in_channels, embed_dim)
@@ -97,18 +93,12 @@ class ViTOperator2d(nn.Module):
     
     v = self.input_project(v)
     d = decompose2d(v, n_sub_x, n_sub_y)
-    batch_size = d.size(0)
-    seq_len = d.size(1)
-    d = self.flatten(d)
-    d = self.padding.pad(d)
-    d = self.unflatten(d, batch_size, seq_len)
-        
+    d = seq_op(self.padding.pad, d)
+            
     for embed in self.embed:
       d = embed(d, n_sub_x, n_sub_y)
       
-    d = self.flatten(d)
-    d = self.padding.unpad(d)
-    d = self.unflatten(d, batch_size, seq_len)
+    d = seq_op(self.padding.unpad, d)
     u = recompose2d(d, n_sub_x, n_sub_y)
     u = self.output_project(u)
       

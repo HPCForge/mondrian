@@ -4,7 +4,7 @@ import torch
 from torch import nn
 
 from .fast_math import self_attention
-from .spectral_conv import SimpleSpectralConv
+from .spectral_conv import SimpleSpectralConv2d
 from .log_cpb import LogCPB
 
 class ViTSelfAttentionOperator(nn.Module):
@@ -18,18 +18,19 @@ class ViTSelfAttentionOperator(nn.Module):
                embed_dim,
                num_heads):
     super().__init__()
+    assert embed_dim > num_heads and embed_dim % num_heads == 0
     self.embed_dim = embed_dim
     self.num_heads = num_heads
 
-    modes = (16, 16)
-    self.query_operator = SimpleSpectralConv(embed_dim, embed_dim * num_heads, modes)
-    self.key_oeprator = SimpleSpectralConv(embed_dim, embed_dim * num_heads, modes)
-    self.value_operator = SimpleSpectralConv(embed_dim, embed_dim * num_heads, modes)
-    self.output_operator = SimpleSpectralConv(num_heads * embed_dim, embed_dim, modes)
+    modes = 8
+    self.query_operator = SimpleSpectralConv2d(embed_dim, embed_dim, modes)
+    self.key_oeprator = SimpleSpectralConv2d(embed_dim, embed_dim, modes)
+    self.value_operator = SimpleSpectralConv2d(embed_dim, embed_dim, modes)
+    self.output_operator = SimpleSpectralConv2d(embed_dim, embed_dim, modes)
     self.log_cpb = LogCPB(embed_dim, num_heads)
 
   def _unflatten(self, f):
-    f = torch.unflatten(f, 2, (self.num_heads, self.embed_dim))
+    f = torch.unflatten(f, 2, (self.num_heads, self.embed_dim // self.num_heads))
     return torch.transpose(f, 1, 2)
   
   def _flatten(self, f):

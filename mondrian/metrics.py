@@ -22,7 +22,7 @@ class Metrics:
 
     def log_max_error(self, input, target, stage):
         max_err = max_error(input, target)
-        self.log_func(f'{stage}/MaxError', l2_err.detach(), prog_bar=True)
+        self.log_func(f'{stage}/MaxError', max_err.detach(), prog_bar=True)
 
     def log(self, input, target, stage):
         l2_err = l2_error(input, target)

@@ -41,7 +41,7 @@ def main(cfg):
     in_channels = train_dataset.in_channels
     out_channels = train_dataset.out_channels
 
-    model = ViTOperator2d(in_channels, out_channels, 16, 4, 3, subdomain_size=(1, 1)).cuda()
+    model = ViTOperator2d(in_channels, out_channels, 16, 4, 4, subdomain_size=(1, 1)).cuda()
 
     # setup lightning module
     max_epochs = int(cfg.experiment.train_cfg.max_epochs)
@@ -85,8 +85,8 @@ def get_datasets(cfg, dtype):
     if cfg.experiment.name in POSEIDON_DATSETS:
         kwargs = {
             'num_trajectories': 1000,
-            'resolution': 64,
-            # confused how to use these...
+            'resolution': 128,
+            # TODO: confused how to use these...
             'max_num_time_steps': 4,
             'time_step_size': 4,
             'data_path': cfg.experiment.data_path
