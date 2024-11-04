@@ -18,7 +18,7 @@ from mondrian.dataset.poseidon.base import (
     get_dataset as get_poseidon_dataset,
     POSEIDON_DATSETS
 )
-from mondrian.dataset.reno_shear_layer_dataset import ShearLayerDataset
+from mondrian.dataset.reno_shear_layer_dataset import ShearLayerDataset, AllenCahnDataset
 from mondrian.trainer.poseidon_trainer import PoseidonModule
 from mondrian.trainer.reno_trainer import RENOModule
 
@@ -90,6 +90,11 @@ def get_datasets(cfg, dtype):
         train_dataset = ShearLayerDataset(cfg.experiment.data_path, which='training', s=128)
         val_dataset = ShearLayerDataset(cfg.experiment.data_path, which='validation', s=128)
         test_dataset = ShearLayerDataset(cfg.experiment.data_path, which='test', s=128)
+    elif cfg.experiment.name == 'allen_cahn':
+        train_dataset = AllenCahnDataset(cfg.experiment.data_path, which='training')
+        val_dataset = AllenCahnDataset(cfg.experiment.data_path, which='validation')
+        test_dataset = AllenCahnDataset(cfg.experiment.data_path, which='test')
+
     return train_dataset, val_dataset
 
 def get_dataloaders(cfg, dtype):

@@ -1,0 +1,18 @@
+name: allen_cahn
+
+data_path: '/share/crsp/lab/ai4ts/share/BubbleML_f32/AllenCahn/'
+model_ckpt_path: '/data/homezvol2/jackh15/mondrian/Mondrian-DDOp/checkpoints'
+use_point: False
+train_cfg:
+  batch_size: 16
+  max_epochs: 1000
+
+model_cfg:
+  model_name: ddno_ref
+  hidden_channels: 32
+  layers: 6
+  op_cfg:
+    op_name: additive
+    kernel_name: low_rank
+    use_padding: False
+    use_coarse_op: False
