@@ -46,6 +46,7 @@ def main(cfg):
 
     # setup callbacks
     checkpoint_callback = ModelCheckpoint(
+            dirpath=cfg.experiment.model_ckpt_path,
             save_top_k=1,
             save_last=True,
             monitor='Val/L2Error',
