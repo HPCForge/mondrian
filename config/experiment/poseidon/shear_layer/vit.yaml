@@ -1,0 +1,9 @@
+name: fluids.incompressible.ShearLayer
+
+data_path: '/pub/afeeney/data/'
+
+use_point: False
+
+train_cfg:
+  batch_size: 32
+  max_epochs: 1000

@@ -42,5 +42,3 @@ class PointDataset(Dataset):
                     #tgt_coords=c)
 
         return data
-
-        

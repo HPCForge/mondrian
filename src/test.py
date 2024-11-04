@@ -6,7 +6,7 @@ import torch
 from torch.utils.data import DataLoader
 import lightning as L
 
-from mondrian.dataset.shear_layer_dataset import ShearLayerDataset
+from mondrian.dataset.reno_shear_layer_dataset import ShearLayerDataset
 from mondrian.trainer.reno_trainer import RENOModule
 
 @hydra.main(version_base=None, config_path='../config', config_name='default')

@@ -1,0 +1,9 @@
+name: shear_layer
+
+data_path: '/pub/afeeney/data/data'
+
+use_point: False
+
+train_cfg:
+  batch_size: 16
+  max_epochs: 1000

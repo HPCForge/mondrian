@@ -14,7 +14,12 @@ from lightning.pytorch.callbacks import (
 from torch_geometric.data import DataLoader as PyGDataLoader
 
 from mondrian.models import ViTOperator2d
-from mondrian.dataset.shear_layer_dataset import ShearLayerDataset
+from mondrian.dataset.poseidon.base import (
+    get_dataset as get_poseidon_dataset,
+    POSEIDON_DATSETS
+)
+from mondrian.dataset.reno_shear_layer_dataset import ShearLayerDataset
+from mondrian.trainer.poseidon_trainer import PoseidonModule
 from mondrian.trainer.reno_trainer import RENOModule
 
 @hydra.main(version_base=None, config_path='../config', config_name='default')
@@ -36,7 +41,7 @@ def main(cfg):
     in_channels = train_dataset.in_channels
     out_channels = train_dataset.out_channels
 
-    model = ViTOperator2d(in_channels, out_channels, 16, 4, 4, subdomain_size=(1, 1)).cuda()
+    model = ViTOperator2d(in_channels, out_channels, 16, 4, 3, subdomain_size=(1, 1)).cuda()
 
     # setup lightning module
     max_epochs = int(cfg.experiment.train_cfg.max_epochs)
@@ -66,17 +71,32 @@ def get_module(cfg):
     name = cfg.experiment.name
     #if name == 'bubbleml':
     #    return BubbleMLModule
-    #elif name in ('shear_layer', 'disc_transport', 'poisson'):
-    #    if cfg.experiment.use_point:
-    #        return RENOPointModule
-    return RENOModule
+    if name in POSEIDON_DATSETS:
+        return PoseidonModule
+    elif name in ('shear_layer', 'disc_transport', 'poisson'):
+        return RENOModule
 
 def get_datasets(cfg, dtype):
     if cfg.experiment.name == 'bubbleml':
-        pass
         # TODO: should make a train/val/test split, once I've generated a larger dataset
         #train_dataset = BubbleMLDataset(cfg.experiment.train_path, style='train', dtype=dtype)
         #test_dataset = BubbleMLDataset(cfg.experiment.test_path, style='test', dtype=dtype)
+        pass
+    if cfg.experiment.name in POSEIDON_DATSETS:
+        kwargs = {
+            'num_trajectories': 1000,
+            'resolution': 64,
+            # confused how to use these...
+            'max_num_time_steps': 4,
+            'time_step_size': 4,
+            'data_path': cfg.experiment.data_path
+        }
+        train_dataset = get_poseidon_dataset(
+            cfg.experiment.name, which='train', **kwargs)
+        val_dataset = get_poseidon_dataset(
+            cfg.experiment.name, which='val', **kwargs)
+        test_dataset = get_poseidon_dataset(
+            cfg.experiment.name, which='test', **kwargs)
     elif cfg.experiment.name == 'shear_layer':
         train_dataset = ShearLayerDataset(cfg.experiment.data_path, which='training', s=128)
         val_dataset = ShearLayerDataset(cfg.experiment.data_path, which='validation', s=128)
@@ -88,8 +108,8 @@ def get_dataloaders(train_dataset, val_dataset, cfg):
     exp = ('bubbleml', 'shear_layer', 'disc_transport', 'poisson')
 
     # TODO: these should just be in experiment config
-    train_workers = 4
-    test_workers = 4
+    train_workers = 2
+    test_workers = 2
     # BubbleML test inputs are huge, so use more workers
     if exp == 'bubbleml':
         test_workers = 10
@@ -99,16 +119,18 @@ def get_dataloaders(train_dataset, val_dataset, cfg):
     else:
         DL = DataLoader
     
-    if cfg.experiment.name in exp:
-        # TODO: add val loader when bubbleml ready
-        train_loader = DL(train_dataset,
-                          batch_size=batch_size,
-                          shuffle=True,
-                          num_workers=train_workers)
-        val_loader = DL(val_dataset,
+    #if cfg.experiment.name in exp:
+    # TODO: add val loader when bubbleml ready
+    train_loader = DL(train_dataset,
                         batch_size=batch_size,
-                        shuffle=False,
-                        num_workers=test_workers)
+                        shuffle=True,
+                        num_workers=train_workers,
+                        pin_memory=True)
+    val_loader = DL(val_dataset,
+                    batch_size=batch_size,
+                    shuffle=False,
+                    num_workers=test_workers,
+                    pin_memory=True)
     return train_loader, val_loader
 
 if __name__ == '__main__':

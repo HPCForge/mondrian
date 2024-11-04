@@ -1,1 +1,1 @@
-from .vit_operator import ViTOperator2d
+from .vit_operator_2d import ViTOperator2d
