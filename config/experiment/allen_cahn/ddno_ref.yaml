@@ -4,7 +4,7 @@ data_path: '/share/crsp/lab/ai4ts/share/BubbleML_f32/AllenCahn/'
 model_ckpt_path: '/data/homezvol2/jackh15/mondrian/Mondrian-DDOp/checkpoints'
 use_point: False
 train_cfg:
-  batch_size: 16
+  batch_size: 4
   max_epochs: 1000
 
 model_cfg:
