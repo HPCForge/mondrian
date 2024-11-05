@@ -18,8 +18,9 @@ from mondrian.dataset.poseidon.base import (
     get_dataset as get_poseidon_dataset,
     POSEIDON_DATSETS
 )
-from mondrian.dataset.reno_shear_layer_dataset import ShearLayerDataset, AllenCahnDataset
+from mondrian.dataset.reno_shear_layer_dataset import ShearLayerDataset
 from mondrian.trainer.poseidon_trainer import PoseidonModule
+from mondrian.dataset.allen_cahn_dataset import AllenCahnDataset
 from mondrian.trainer.reno_trainer import RENOModule
 
 @hydra.main(version_base=None, config_path='../config', config_name='default')
@@ -100,6 +101,19 @@ def get_datasets(cfg, dtype):
 
 def get_dataloaders(cfg, dtype):
     batch_size = cfg.experiment.train_cfg.batch_size
+    exp = ('bubbleml', 'shear_layer', 'disc_transport', 'poisson', 'allen_cahn')
+
+    # TODO: these should just be in experiment config
+    train_workers = 4
+    test_workers = 4
+    # BubbleML test inputs are huge, so use more workers
+    if exp == 'bubbleml':
+        test_workers = 10
+
+    if cfg.experiment.use_point:
+        DL = PyGDataLoader
+    else:
+        DL = DataLoader
     
     train_workers = cfg.experiment.train_workers
     test_workers = cfg.experiment.test_workers
