@@ -2,7 +2,11 @@ log_dir:
 
 model_ckpt_path:
 
+seed: 1
+
+wandb:
+  offline: False
+
 defaults:
   - _self_
-  - dataset:
   - experiment:

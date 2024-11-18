@@ -1,0 +1,12 @@
+name: era5
+
+data_path: '/pub/afeeney/data/climatelearn/era5_5625/processed/'
+
+use_point: False
+
+train_workers: 8
+test_workers: 8
+
+train_cfg:
+  batch_size: 16
+  max_epochs: 50
