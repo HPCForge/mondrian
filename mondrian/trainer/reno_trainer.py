@@ -35,25 +35,25 @@ class RENOModule(L.LightningModule):
                 total_steps=self.total_iters)
         scheduler_config = {'scheduler': scheduler,
                             'interval': 'step'}
-        return [optimizer], [scheduler_config]
+        return [optimizer]#, [scheduler_config]
 
     def forward(self, x):
-        return self.model(x, 4, 4)
+        return self.model(x, 8, 8)
 
     def training_step(self, batch, batch_idx):
         x, y = batch
-        pred = self.model(x, 4, 4)
+        pred = self.forward(x)
         loss = self.metrics.log(pred, y, 'Train')
         return loss
 
     def validation_step(self, batch, batch_idx):
         x, y = batch
-        pred = self.model(x, 4, 4)
+        pred = self.forward(x)
         loss = self.metrics.log(pred, y, 'Val')
         return loss
 
     def test_step(self, batch, batch_idx):
         x, y = batch
-        pred = self.model(x, 4, 4)
+        pred = self.forward(x)
         loss = self.metrics.log(pred, y, 'Test')
         return loss

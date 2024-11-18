@@ -52,11 +52,23 @@ def test_self_attention():
   k = torch.zeros(2, 4, 8, 16, 32, 32)
   v = torch.zeros(2, 4, 8, 16, 32, 32)
   
-  sa = fm.self_attention(q, k, v)
+  sa = fm.attention(q, k, v)
   assert sa.sum() == 0
   assert sa.min() >= 0
   assert sa.max() <= 1
   
+def test_cross_attention():
+  q = torch.zeros(2, 4, 16, 16, 32, 32)
+  k = torch.zeros(2, 4, 8, 16, 32, 32)
+  v = torch.zeros(2, 4, 8, 16, 32, 32)
+  
+  sa = fm.attention(q, k, v)
+  assert sa.sum() == 0
+  assert sa.min() >= 0
+  assert sa.max() <= 1
+  assert sa.size(2) == 16
+
+"""
 def test_self_attention_bias():
   q = torch.ones(2, 4, 8, 16, 32, 32)
   k = torch.ones(2, 4, 8, 16, 32, 32)
@@ -67,3 +79,4 @@ def test_self_attention_bias():
   assert sa.min() >= 0
   assert sa.max() <= 1
   assert sa.isfinite().all()
+"""

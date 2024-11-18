@@ -37,7 +37,7 @@ class LogCPB(nn.Module):
       n_sub_x: number of subdomains in x direction
       n_sub_y: number of subdomains in y direction
     Returns:
-      bias: [num_heads x seq_len x seq_len] is a 
+      bias: [1 x num_heads x seq_len x seq_len] is a 
             position bias, seq_len == n_sub_x * n_sub_y
     """
     grid = self._get_bias(n_sub_x, n_sub_y, device)

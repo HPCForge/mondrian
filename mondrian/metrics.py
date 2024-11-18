@@ -22,13 +22,15 @@ class Metrics:
 
     def log_max_error(self, input, target, stage):
         max_err = max_error(input, target)
-        self.log_func(f'{stage}/MaxError', max_err.detach(), prog_bar=True)
+        batch_size = input.size(0)
+        self.log_func(f'{stage}/MaxError', max_err.detach(), prog_bar=True, batch_size=batch_size)
 
     def log(self, input, target, stage):
         l2_err = l2_error(input, target)
-        self.log_func(f'{stage}/L2Error', l2_err.detach(), prog_bar=True)
+        batch_size = input.size(0)
+        self.log_func(f'{stage}/L2Error', l2_err.detach(), prog_bar=True, batch_size=batch_size)
 
         l1_err = l1_error(input, target)
-        self.log_func(f'{stage}/L1Error', l1_err.detach())
+        self.log_func(f'{stage}/L1Error', l1_err.detach(), batch_size=batch_size)
 
         return l2_err

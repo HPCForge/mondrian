@@ -5,8 +5,8 @@ from torch import nn
 
 from mondrian.grid.decompose import decompose2d, recompose2d
 from mondrian.grid.spectral_conv import SimpleSpectralConv2d
-from mondrian.grid.vit_self_attention_operator import ViTSelfAttentionOperator
-from mondrian.grid.pointwise_linear import PointwiseLinear
+from mondrian.grid.func_self_attention import FuncSelfAttention
+from mondrian.grid.pointwise import PointwiseMLP2d
 from mondrian.grid.seq_op import seq_op
 
 from neuralop.layers.padding import DomainPadding
@@ -17,10 +17,6 @@ class SequenceInstanceNorm2d(nn.Module):
     self.norm = nn.InstanceNorm2d(embed_dim)
     
   def forward(self, v):
-    r"""
-    Flattens the batch and sequence dimension of the input
-    `v`, so that it can be passed into a standard instance norm.
-    """
     return seq_op(self.norm, v)
 
 class Encoder(nn.Module):
@@ -28,29 +24,50 @@ class Encoder(nn.Module):
                embed_dim, 
                num_heads):
     super().__init__()
-    self.sa = ViTSelfAttentionOperator(embed_dim, num_heads)
-    modes = 16
+    self.sa = FuncSelfAttention(embed_dim, num_heads)
+    modes = 8
     self.spectral_conv1 = SimpleSpectralConv2d(embed_dim, embed_dim, modes)
     self.spectral_conv2 = SimpleSpectralConv2d(embed_dim, embed_dim, modes)
 
     self.norm1 = SequenceInstanceNorm2d(embed_dim)
     self.norm2 = SequenceInstanceNorm2d(embed_dim)
     
-  def forward(self, v, n_sub_x, n_sub_y):
-    v = self.norm1(self.sa(v, n_sub_x, n_sub_y) + v)
-    v = nn.functional.gelu(self.spectral_conv1(v) + v)
+  def _spectral(self, v):
+    v = nn.functional.gelu(self.spectral_conv1(v)) + v
+    v = nn.functional.gelu(self.spectral_conv1(v)) + v
     v = self.norm2(self.spectral_conv2(v) + v)
+    return v
+
+  def forward(self, v, n_sub_x, n_sub_y):
+    v = self.norm1(self.sa(v, n_sub_x, n_sub_y)) + v
+    v = self._spectral(v) + v    
     return v
 
 class ViTOperator2d(nn.Module):
   def __init__(self,
-               in_channels,
-               out_channels,
-               embed_dim,
-               num_heads,
-               num_layers,
+               in_channels: int,
+               out_channels: int,
+               embed_dim: int,
+               num_heads: int,
+               num_layers: int,
                subdomain_size: Union[int, Tuple[int, int]]):
+    r"""
+    An implementation of a ViT-style operator, specific to regular 2d grids.
+    Similar to nn.MultiheadAttention, the embedding dim of each head 
+    is computed as `embed_dim // num_heads`.
+    Parameters:
+      in_channels: The expected number of channels input to the model.
+      out_channels: The number of channels output by the model. 
+      embed_dim: The number of channels used in the attention operators. 
+      num_heads: The number of heads used in multihead attention. 
+      num_layers: The number of Encoder blocks.
+      sub_domain_size: The physical subdomain size. This is independent of
+                       the input discretization. It should correspond to some
+                       "physical" dimension, relative to the global domain size.
+    """
     super().__init__()
+    self.in_channels = in_channels
+    self.out_channels = out_channels
     
     if isinstance(subdomain_size, int):
       subdomain_size = (subdomain_size, subdomain_size)
@@ -61,29 +78,25 @@ class ViTOperator2d(nn.Module):
     self.sub_size_y = self.subdomain_size[0]
     self.sub_size_x = self.subdomain_size[1]
     
-    self.embed = nn.ModuleList([
-      Encoder(embed_dim, num_heads) for _ in range(num_layers)
-    ])
-    
-    self.input_project = PointwiseLinear(in_channels, embed_dim)
-    self.output_project = PointwiseLinear(embed_dim, out_channels)
+    self.embed = nn.ModuleList([Encoder(embed_dim, num_heads) for _ in range(num_layers)])
+
+    self.input_project = PointwiseMLP2d(in_channels, embed_dim, hidden_channels=128)
+    self.output_project = PointwiseMLP2d(embed_dim, out_channels, hidden_channels=128)
     
     self.padding = DomainPadding(0.25)
-    
-  def flatten(self, v):
-    r"""
-    flatten batch and sequence dimensions into one dimension
-    Args:
-      v: [batch x seq-len x ...]
-    Returns:
-      flat: [(batch x seq_len) x ...]]
-    """
-    return torch.flatten(v, start_dim=0, end_dim=1)
-  
-  def unflatten(self, v, batch_size, seq_len):
-    return torch.unflatten(v, dim=0, sizes=(batch_size, seq_len))
-    
+
   def forward(self, v: torch.Tensor, domain_size_y: int, domain_size_x: int):
+    r"""
+    Args:
+      v: [batch_size x in_channels x H x W], the input function discretized on a 
+         regular grid.
+      domain_size_y: The size, in the y-direction, corresponding to the axis H,
+                     of domain that the function v is defined on.
+      domain_size_x: The domain's size in the x-direction.
+    Returns:
+      u: [batch_size x out_channels x H x W]
+    """
+    assert v.size(1) == self.in_channels
     assert isinstance(domain_size_y, int)
     assert isinstance(domain_size_x, int)
     assert domain_size_y % self.sub_size_y == 0
@@ -94,12 +107,12 @@ class ViTOperator2d(nn.Module):
     v = self.input_project(v)
     d = decompose2d(v, n_sub_x, n_sub_y)
     d = seq_op(self.padding.pad, d)
-            
+
     for embed in self.embed:
       d = embed(d, n_sub_x, n_sub_y)
       
     d = seq_op(self.padding.unpad, d)
     u = recompose2d(d, n_sub_x, n_sub_y)
     u = self.output_project(u)
-      
+    
     return u

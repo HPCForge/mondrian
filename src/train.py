@@ -1,5 +1,6 @@
 from omegaconf import DictConfig, OmegaConf
 import hydra
+from dataclasses import dataclass
 
 import torch
 from torch.utils.data import DataLoader
@@ -10,8 +11,7 @@ from lightning.pytorch.callbacks import (
         EarlyStopping
 )
 
-# TODO: tidy up data loading stuff
-from torch_geometric.data import DataLoader as PyGDataLoader
+from climate_learn.transforms import Denormalize
 
 from mondrian.models import ViTOperator2d
 from mondrian.dataset.poseidon.base import (
@@ -27,26 +27,22 @@ def main(cfg):
     print(OmegaConf.to_yaml(cfg))
     
     dtype = torch.float32
-    device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
     # use tensor cores
     torch.set_float32_matmul_precision('medium')
-
-    # get experiment dataset
-    train_dataset, val_dataset = get_datasets(cfg, dtype)
-
+    # Enable TF32 on matmul and cudnn.
+    torch.backends.cuda.matmul.allow_tf32 = True
+    torch.backends.cudnn.allow_tf32 = True
+    
     # build experiment dataloaders
-    train_loader, val_loader = get_dataloaders(train_dataset, val_dataset, cfg)
+    train_loader, val_loader, in_channels, out_channels = get_dataloaders(cfg, dtype)
 
     # get model
-    in_channels = train_dataset.in_channels
-    out_channels = train_dataset.out_channels
-
-    model = ViTOperator2d(in_channels, out_channels, 16, 4, 4, subdomain_size=(1, 1)).cuda()
+    model = ViTOperator2d(in_channels, out_channels, 16, 4, 4, subdomain_size=(1, 1))
 
     # setup lightning module
     max_epochs = int(cfg.experiment.train_cfg.max_epochs)
-    total_iters = len(train_loader) * max_epochs
-    module = get_module(cfg)(model, total_iters)
+    max_iters = len(train_loader) * max_epochs
+    module = get_module(cfg)(model, max_iters)
 
     # setup callbacks
     checkpoint_callback = ModelCheckpoint(
@@ -67,21 +63,14 @@ def main(cfg):
     trainer = L.Trainer(callbacks=callbacks, max_epochs=max_epochs)
     trainer.fit(module, train_loader, val_loader)
 
-def get_module(cfg):
+def get_module(cfg, **kwargs):
     name = cfg.experiment.name
-    #if name == 'bubbleml':
-    #    return BubbleMLModule
     if name in POSEIDON_DATSETS:
         return PoseidonModule
     elif name in ('shear_layer', 'disc_transport', 'poisson'):
         return RENOModule
 
 def get_datasets(cfg, dtype):
-    if cfg.experiment.name == 'bubbleml':
-        # TODO: should make a train/val/test split, once I've generated a larger dataset
-        #train_dataset = BubbleMLDataset(cfg.experiment.train_path, style='train', dtype=dtype)
-        #test_dataset = BubbleMLDataset(cfg.experiment.test_path, style='test', dtype=dtype)
-        pass
     if cfg.experiment.name in POSEIDON_DATSETS:
         kwargs = {
             'num_trajectories': 1000,
@@ -103,35 +92,30 @@ def get_datasets(cfg, dtype):
         test_dataset = ShearLayerDataset(cfg.experiment.data_path, which='test', s=128)
     return train_dataset, val_dataset
 
-def get_dataloaders(train_dataset, val_dataset, cfg):
+def get_dataloaders(cfg, dtype):
     batch_size = cfg.experiment.train_cfg.batch_size
-    exp = ('bubbleml', 'shear_layer', 'disc_transport', 'poisson')
-
-    # TODO: these should just be in experiment config
-    train_workers = 2
-    test_workers = 2
-    # BubbleML test inputs are huge, so use more workers
-    if exp == 'bubbleml':
-        test_workers = 10
-
-    if cfg.experiment.use_point:
-        DL = PyGDataLoader
-    else:
-        DL = DataLoader
+    
+    train_workers = cfg.experiment.train_workers
+    test_workers = cfg.experiment.test_workers
+    
+    # get experiment dataset
+    train_dataset, val_dataset = get_datasets(cfg, dtype)
+    in_channels = train_dataset.in_channels
+    out_channels = train_dataset.out_channels
     
     #if cfg.experiment.name in exp:
     # TODO: add val loader when bubbleml ready
-    train_loader = DL(train_dataset,
-                        batch_size=batch_size,
-                        shuffle=True,
-                        num_workers=train_workers,
-                        pin_memory=True)
-    val_loader = DL(val_dataset,
-                    batch_size=batch_size,
-                    shuffle=False,
-                    num_workers=test_workers,
-                    pin_memory=True)
-    return train_loader, val_loader
+    train_loader = DataLoader(train_dataset,
+                              batch_size=batch_size,
+                              shuffle=True,
+                              num_workers=train_workers,
+                              pin_memory=True)
+    val_loader = DataLoader(val_dataset,
+                            batch_size=batch_size,
+                            shuffle=False,
+                            num_workers=test_workers,
+                            pin_memory=True)
+    return train_loader, val_loader, in_channels, out_channels
 
 if __name__ == '__main__':
     main()
