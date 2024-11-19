@@ -4,7 +4,7 @@ import torch
 import torch.nn.functional as F
 import lightning as L
 
-from climate_learn.models.lr_scheduler import LinearWarmupCosineAnnealingLR
+from mondrian.lr_schedule import WarmupCosineAnnealingLR
 from climate_learn.metrics import (
   MSE,
   RMSE,
@@ -15,7 +15,7 @@ from climate_learn.metrics import (
 class ERA5Module(L.LightningModule):
     def __init__(self,
                  model,
-                 max_epochs,
+                 total_iters,
                  train_denormalize,
                  val_denormalize,
                  test_denormalize,
@@ -24,7 +24,7 @@ class ERA5Module(L.LightningModule):
         super().__init__()
         self.save_hyperparameters()
         self.model = model
-        self.max_epochs = max_epochs
+        self.total_iters = total_iters
         self.lr = lr
         self.weight_decay = weight_decay
         
@@ -58,14 +58,11 @@ class ERA5Module(L.LightningModule):
         optimizer = torch.optim.AdamW(self.model.parameters(),
                                       lr=self.lr,
                                       weight_decay=self.weight_decay)
-        scheduler = LinearWarmupCosineAnnealingLR(
+        scheduler = WarmupCosineAnnealingLR(
                 optimizer,
-                warmup_epochs=3,
-                # The warmup is poorly setup, since it only takes steps each epoch.
-                # So it starts fairly large.
-                warmup_start_lr=1e-6,
-                eta_min=1e-8,
-                max_epochs=self.max_epochs)
+                warmup_iters=1000,
+                total_iters=self.total_iters,
+                eta_min=1e-8)
         scheduler_config = {'scheduler': scheduler,
                             'interval': 'epoch'}
         return [optimizer], [scheduler_config]

@@ -9,4 +9,5 @@ test_workers: 8
 
 train_cfg:
   batch_size: 16
-  max_epochs: 50
+  max_steps: 5000
+  pred_range: 24

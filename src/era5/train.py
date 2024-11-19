@@ -22,14 +22,14 @@ from mondrian.dataset.climate_learn.era5_dataloader import (
 )
 from mondrian.trainer.era5_trainer import ERA5Module
 
-@hydra.main(version_base=None, config_path='../config', config_name='default')
+@hydra.main(version_base=None, config_path='../../config', config_name='default')
 def main(cfg):
     print(OmegaConf.to_yaml(cfg))
 
+    # need to set seeds for distributed training
     torch.manual_seed(cfg.seed)
     torch.cuda.manual_seed(cfg.seed)
     
-    dtype = torch.bfloat16
     # use tensor cores
     torch.set_float32_matmul_precision('medium')
     # Enable TF32 on matmul and cudnn.
@@ -37,7 +37,7 @@ def main(cfg):
     torch.backends.cudnn.allow_tf32 = True
 
     # build experiment dataloaders
-    (dm, train_loader, val_loader) = get_dataloaders(cfg, dtype)
+    (dm, train_loader, val_loader, test_loader) = get_dataloaders(cfg)
     
     denormalize = Denormalize(dm)
 
@@ -50,10 +50,10 @@ def main(cfg):
     model = ViTOperator2d(in_channels, out_channels, 16, 4, 4, subdomain_size=(1, 1))
 
     # setup lightning module
-    max_epochs = int(cfg.experiment.train_cfg.max_epochs)
+    max_steps = int(cfg.experiment.train_cfg.max_steps)    
     module = ERA5Module(
       model, 
-      max_epochs, 
+      total_iters=max_steps, 
       train_denormalize=denormalize,
       val_denormalize=denormalize,
       test_denormalize=denormalize)
@@ -79,9 +79,7 @@ def main(cfg):
             processing_speed="grey82",
             metrics="grey82",
             metrics_text_delimiter="\n",
-            metrics_format=".3e",
-        )
-    )
+            metrics_format=".3e"))
     callbacks = [
             checkpoint_callback,
             early_stopping_callback,
@@ -97,15 +95,16 @@ def main(cfg):
         devices=torch.cuda.device_count(),
         logger=logger,
         callbacks=callbacks, 
-        max_epochs=max_epochs,
+        max_steps=max_steps,
         gradient_clip_val=0.5)
     trainer.fit(module, train_loader, val_loader)
+    trainer.test(test_loader)
 
-def get_dataloaders(cfg, dtype):
+def get_dataloaders(cfg):
     assert cfg.experiment.name == 'era5'    
     dm = get_era5_dataloaders(
         cfg.experiment.data_path,
-        pred_range=24,
+        pred_range=cfg.experiment.train_cfg.pred_range,
         batch_size=cfg.experiment.train_cfg.batch_size,
         num_workers=cfg.experiment.train_workers,
         pin_memory=False
@@ -113,7 +112,8 @@ def get_dataloaders(cfg, dtype):
     return (
       dm,
       dm.train_dataloader(),
-      dm.val_dataloader()      
+      dm.val_dataloader(),
+      dm.test_dataloader()
     )
 
 if __name__ == '__main__':
