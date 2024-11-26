@@ -1,7 +1,7 @@
 import h5py
 import torch
 from torch.utils.data import Dataset, default_collate
-from imgs.viz import viz_data
+
 DIFFUSIVITY = 'diffusivity'
 SOLUTION = 'solution'
 XLIM = 'xlim'
