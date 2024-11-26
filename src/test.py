@@ -7,6 +7,7 @@ from torch.utils.data import DataLoader
 import lightning as L
 
 from mondrian.dataset.reno_shear_layer_dataset import ShearLayerDataset
+from mondrian.dataset.allen_cahn_dataset import AllenCahnDataset
 from mondrian.trainer.reno_trainer import RENOModule
 
 @hydra.main(version_base=None, config_path='../config', config_name='default')
@@ -30,14 +31,15 @@ def main(cfg):
     
     # run a second time to save outputs
     accum = {'Input': [], 'Label': [], 'Pred': []} 
-    for batch in test_loader:
+    for i,batch in enumerate(test_loader):
         input = batch[0]
         label = batch[-1]
         pred = module(input).detach().cpu()
         accum['Input'].append(input)
         accum['Label'].append(label)
         accum['Pred'].append(pred)
-
+        if i > 0:
+            break
     prefix = cfg.model_ckpt_path[:-len('.ckpt')]
     pathlib.Path(prefix).mkdir(parents=True, exist_ok=True)
     print(prefix)
@@ -54,16 +56,18 @@ def get_datasets(cfg, dtype):
     #if cfg.experiment.name == 'bubbleml':
     #    test_dataset = BubbleMLDataset(cfg.experiment.test_path, style='test', dtype=dtype)
     #elif cfg.experiment.name == 'shear_layer':
-    test_dataset = ShearLayerDataset(cfg.experiment.data_path, which='test', s=128)
+    # test_dataset = ShearLayerDataset(cfg.experiment.data_path, which='test', s=128)
     #elif cfg.experiment.name == 'disc_transport':
     #    test_dataset = DiscTransportDataset(cfg.experiment.data_path, which='test')
     #elif cfg.experiment.name == 'poisson':
     #    test_dataset = PoissonDataset(cfg.experiment.data_path, which='test')
+
+    test_dataset = AllenCahnDataset(cfg.experiment.data_path, which='test', in_steps=5, out_steps=5)
     return test_dataset
 
 def get_dataloaders(test_dataset, cfg):
     batch_size = cfg.experiment.train_cfg.batch_size
-    exp = ('shear_layer', 'disc_transport', 'poisson')
+    exp = ('shear_layer', 'disc_transport', 'poisson', 'allen_cahn')
     if cfg.experiment.name in exp:
         # TODO: add val loader when bubbleml ready
         test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
