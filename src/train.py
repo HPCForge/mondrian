@@ -13,7 +13,7 @@ from lightning.pytorch.callbacks import (
 
 from climate_learn.transforms import Denormalize
 
-from mondrian.models import ViTOperator2d
+from mondrian.models import ViTOperator2d, WinSAOperator2d
 from mondrian.dataset.poseidon.base import (
     get_dataset as get_poseidon_dataset,
     POSEIDON_DATSETS
@@ -22,6 +22,7 @@ from mondrian.dataset.reno_shear_layer_dataset import ShearLayerDataset
 from mondrian.trainer.poseidon_trainer import PoseidonModule
 from mondrian.dataset.allen_cahn_dataset import AllenCahnDataset
 from mondrian.trainer.reno_trainer import RENOModule
+from pytorch_lightning import loggers as pl_loggers
 
 @hydra.main(version_base=None, config_path='../config', config_name='default')
 def main(cfg):
@@ -48,8 +49,9 @@ def main(cfg):
     # setup callbacks
     checkpoint_callback = ModelCheckpoint(
             dirpath=cfg.experiment.model_ckpt_path,
+            filename='{epoch}-8W-64X64-4L4H-5in5out',
             save_top_k=1,
-            save_last=True,
+            save_last=False,
             monitor='Val/L2Error',
             mode='min')
     early_stopping_callback = EarlyStopping(
@@ -62,7 +64,9 @@ def main(cfg):
     ]
 
     # run training
-    trainer = L.Trainer(callbacks=callbacks, max_epochs=max_epochs)
+
+    tb_logger = pl_loggers.TensorBoardLogger('logs/')
+    trainer = L.Trainer(callbacks=callbacks, max_epochs=max_epochs,logger=tb_logger)
     trainer.fit(module, train_loader, val_loader)
 
 def get_module(cfg, **kwargs):
@@ -93,9 +97,9 @@ def get_datasets(cfg, dtype):
         val_dataset = ShearLayerDataset(cfg.experiment.data_path, which='validation', s=128)
         test_dataset = ShearLayerDataset(cfg.experiment.data_path, which='test', s=128)
     elif cfg.experiment.name == 'allen_cahn':
-        train_dataset = AllenCahnDataset(cfg.experiment.data_path, which='training')
-        val_dataset = AllenCahnDataset(cfg.experiment.data_path, which='validation')
-        test_dataset = AllenCahnDataset(cfg.experiment.data_path, which='test')
+        train_dataset = AllenCahnDataset(cfg.experiment.data_path, which='training', in_steps=5, out_steps=5)
+        val_dataset = AllenCahnDataset(cfg.experiment.data_path, which='validation', in_steps=5, out_steps=5)
+        test_dataset = AllenCahnDataset(cfg.experiment.data_path, which='test', in_steps=5, out_steps=5)
 
     return train_dataset, val_dataset
 
@@ -136,6 +140,12 @@ def get_dataloaders(cfg, dtype):
                             num_workers=test_workers,
                             pin_memory=True)
     return train_loader, val_loader, in_channels, out_channels
+
+def get_model(model_cfg):
+    if model_cfg.window:
+        return WinSAOperator2d
+    else:  
+        return ViTOperator2d
 
 if __name__ == '__main__':
     main()

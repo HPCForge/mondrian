@@ -8,38 +8,42 @@ XLIM = 'xlim'
 YLIM = 'ylim'
 
 class AllenCahnDataset(Dataset):
-    def __init__(self, filename, which='training'):
-
-        assert which in ('training', 'validation', 'test')
-
-        if which == 'training':
-            self.f = h5py.File(f"{filename}/train.hdf5", 'r')
-        elif which == 'validation':
-            self.f = h5py.File(f"{filename}/valid.hdf5", 'r')
-        elif which == 'test':
-            self.f = h5py.File(f"{filename}/test.hdf5", 'r')    
-        # simulations are grouped by size.
+    def __init__(self, filename, which='training', in_steps=1, out_steps=30):
+        assert in_steps + out_steps <= 31
+        self.f = h5py.File(filename, 'r')
         self.keys = []
+        # diffusivity is the extra channel
+        self.in_steps = in_steps
+        self.in_channels = in_steps + 1
+        self.out_channels = out_steps
+        datasize = {'training': 750, 'validation': 50, 'test': 200}
         size_group_keys = list(self.f.keys())
         for size_group_key in size_group_keys:
-            for sim_key in self.f[size_group_key]:
-                self.keys.append(sim_key)
-                
-        self.in_channels = 1
-        self.out_channels = 30
+            for sim_key in self.f[size_group_key].keys():
+                self.keys.append((size_group_key, sim_key))
+
+        if which == 'training':
+            self.keys = self.keys[:datasize['training']]
+        elif which == 'validation':
+            self.keys = self.keys[datasize['training']:datasize['training']+datasize['validation']]
+        elif which == 'test':
+            self.keys = self.keys[-datasize['test']:]
 
     def __len__(self):
         return len(self.keys)
 
     def __getitem__(self, idx):
-        input = self.keys[idx][:self.in_channels]
-        label = self.keys[idx][self.in_channels:]
+        size_key, sim_key = self.keys[idx]
+        ic = torch.from_numpy(
+            self.f[size_key][sim_key][SOLUTION][:self.in_steps]
+        )
+        # preprocess diffusivity feature
+        diff = self.f[size_key][sim_key].attrs[DIFFUSIVITY]
+        diff_feature = torch.ones_like(ic[0]) * diff
+
+        # add diffusivity to input
+        input = torch.cat([ic, diff_feature.unsqueeze(0)], dim=0).float()
+        label = torch.from_numpy(
+            self.f[size_key][sim_key][SOLUTION][self.in_steps:self.in_steps + self.out_channels]
+        ).float()
         return input, label
-
-
-if __name__ == '__main__':
-    dataset = AllenCahnDataset('/share/crsp/lab/ai4ts/share/BubbleML_f32/AllenCahn/')
-    print(len(dataset))
-    print(f'shape of an input: {dataset[0].shape}')
-    print(f'type of input: {type(dataset[0])}')
-    viz_data(dataset[0][-1])

@@ -24,7 +24,8 @@ class RENOModule(L.LightningModule):
         self.lr = lr
         self.weight_decay = weight_decay
         self.metrics = Metrics(self.log)
-
+        self.subdomain_size_x = 64
+        self.subdomain_size_y = 64
     def configure_optimizers(self):
         optimizer = torch.optim.AdamW(self.model.parameters(),
                                       lr=self.lr,
