@@ -6,7 +6,7 @@ from neuralop.layers.spectral_convolution import SpectralConv
 
 from mondrian.grid.seq_op import seq_op
 
-VERSIONS = ['fno', 'ffno', 'cnn', 'stupid']
+VERSIONS = ['fno', 'ffno', 'cnn', 'random']
 
 class SimpleSpectralConv2d(nn.Module):
     def __init__(self,
@@ -26,8 +26,8 @@ class SimpleSpectralConv2d(nn.Module):
         elif version == 'cnn':
             # This is just for testing
             self.spectral = nn.Conv2d(in_channels, out_channels, kernel_size=(7,7), padding=3)
-        elif version == 'stupid':
-            self.spectral = StupidSpectralConv2d(in_channels, out_channels, inner_dim=32)
+        elif version == 'random':
+            self.spectral = RandomProjectionConv2d(in_channels, out_channels, inner_dim=32)
         
     def forward(self, x):
         r"""
@@ -38,7 +38,7 @@ class SimpleSpectralConv2d(nn.Module):
         """
         assert x.dim() == 5
         return seq_op(self.spectral, x)
-    
+
 class FactorizedSpectralConv2d(nn.Module):
     r"""
     Taken from [fourierflow](https://github.com/alasdairtran/fourierflow).
@@ -105,7 +105,7 @@ class FactorizedSpectralConv2d(nn.Module):
         
         return x
     
-class StupidSpectralConv2d(nn.Module):
+class RandomProjectionConv2d(nn.Module):
     r"""
     This is a 'stupid' idea for something like a spectral convolution. 
     It is based on FNO essentially projecting to a finite dimensional space, and relying
@@ -129,7 +129,9 @@ class StupidSpectralConv2d(nn.Module):
         self.inner_dim = inner_dim
         self.order = 16
 
-        self.c_x = nn.Conv2d(in_dim, out_dim, kernel_size=(5, 5), padding=(2, 2))
+        kernel_size = 5
+        padding = (kernel_size - 1) // 2
+        self.c_x = nn.Conv2d(in_dim, out_dim, kernel_size=kernel_size, padding=padding)
         
         self.down_x_func = nn.Parameter(torch.randn(self.order, self.inner_dim), requires_grad=False)
         self.down_y_func = nn.Parameter(torch.randn(self.order, self.inner_dim), requires_grad=False)

@@ -66,16 +66,6 @@ class FNOFactorized2DBlock(nn.Module):
                 in_dim=width,
                 out_dim=width,
                 n_modes=modes,
-                permute=False,
-                forecast_ff=self.forecast_ff,
-                backcast_ff=self.backcast_ff,
-                fourier_weight=self.fourier_weight,
-                factor=factor,
-                ff_weight_norm=ff_weight_norm,
-                n_ff_layers=n_ff_layers,
-                layer_norm=layer_norm,
-                use_fork=use_fork,
-                dropout=dropout,
                 mode=mode))
 
         self.out = nn.Sequential(

@@ -9,14 +9,15 @@ import lightning as L
 from lightning.pytorch.callbacks import (
         ModelCheckpoint,
         EarlyStopping,
-        RichProgressBar
+        RichProgressBar,
+        LearningRateMonitor
 )
 from lightning.pytorch.callbacks.progress.rich_progress import RichProgressBarTheme
 from lightning.pytorch.loggers import WandbLogger
 
 from climate_learn.transforms import Denormalize
 
-from mondrian.models import ViTOperator2d
+from mondrian.models.get_model import get_model
 from mondrian.dataset.climate_learn.era5_dataloader import (
     get_era5_dataloaders
 )
@@ -33,7 +34,7 @@ def main(cfg):
     # use tensor cores
     torch.set_float32_matmul_precision('medium')
     # Enable TF32 on matmul and cudnn.
-    torch.backends.cuda.matmul.allow_tf32 = True
+    torch.backends.cuda.matmul.allow_tf32 = False
     torch.backends.cudnn.allow_tf32 = True
 
     # build experiment dataloaders
@@ -42,18 +43,20 @@ def main(cfg):
     denormalize = Denormalize(dm)
 
     # Technically, this should be 141 in_channels (47 variables x 3 timestseps + 3 constants),
+    # which is what they list in the paper,
     # but I think the loader repeats the constant fields... So it's just 49 x 3.
     # https://github.com/aditya-grover/climate-learn/blob/b48fb0242acc47e365af86bfbd9dd86e9dcbd6d2/src/climate_learn/data/iterdataset.py#L96C36-L96C49
     in_channels, out_channels = 147, 3
 
     # get model
-    model = ViTOperator2d(in_channels, out_channels, 16, 4, 4, subdomain_size=(1, 1))
+    model = get_model(in_channels, out_channels, cfg.model_cfg)
 
     # setup lightning module
     max_steps = int(cfg.experiment.train_cfg.max_steps)    
     module = ERA5Module(
       model, 
-      total_iters=max_steps, 
+      total_iters=max_steps,
+      domain_size=cfg.train_cfg.domain_size,
       train_denormalize=denormalize,
       val_denormalize=denormalize,
       test_denormalize=denormalize)
@@ -80,10 +83,12 @@ def main(cfg):
             metrics="grey82",
             metrics_text_delimiter="\n",
             metrics_format=".3e"))
+    lr_monitor_callback = LearningRateMonitor(logging_interval='step')
     callbacks = [
             checkpoint_callback,
             early_stopping_callback,
-            progress_bar_callback
+            progress_bar_callback,
+            lr_monitor_callback
     ]
     
     logger = WandbLogger(project='mondrian_era5_5625', offline=cfg.wandb.offline)

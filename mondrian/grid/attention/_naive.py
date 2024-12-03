@@ -1,4 +1,5 @@
 import math
+from typing import Optional
 import einops
 import torch
 from torch.nn.functional import softmax
@@ -40,12 +41,12 @@ def trapezoid_inner_product_score(u, v, p=2):
     return local_inner_product
   
   integral = local_inner_product
-  for i in range(dims_to_sum):
+  for i in range(len(dims_to_sum)):
     integral = torch.trapezoid(integral, dx=1/integral.size(-1))
   return integral
 
-def self_attention(query, key, value, bias=None):
-  score = reimann_inner_product_score(query, key)
+def self_attention(query, key, value, bias: Optional[torch.Tensor]):
+  score = trapezoid_inner_product_score(query, key)
   score = score / math.sqrt(query.size(3))
   if bias is not None:
     score = score + bias

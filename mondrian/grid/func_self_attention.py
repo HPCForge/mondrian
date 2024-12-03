@@ -12,25 +12,30 @@ from .decompose import decompose2d, recompose2d
 class FuncSelfAttention(nn.Module):
   def __init__(self,
                embed_dim: int,
-               num_heads: int):
+               num_heads: int,
+               use_bias: bool):
     super().__init__()
     assert is_power_of_2(embed_dim)
     assert is_power_of_2(num_heads)
     self.embed_dim = embed_dim
     self.num_heads = num_heads
     self.head_dim = embed_dim // num_heads
+    self.use_bias = use_bias
 
     modes = 16
     self.qkv_operator = SimpleSpectralConv2d(embed_dim, 3 * embed_dim, modes)
     self.output_operator = SimpleSpectralConv2d(embed_dim, embed_dim, modes)
-    self.log_cpb = LogCPB(embed_dim, num_heads) 
+    if use_bias:
+      self.log_cpb = LogCPB(embed_dim, num_heads) 
+    else:
+      self.log_cpb = None
     
   def _qkv(self, v):
     dims = [1 for _ in range(v.dim())]
     dims[2] = 3
     v = self.qkv_operator(v) + v.repeat(dims)
     return v
-
+  
   def _flatten(self, f):
     # [batch x seq x heads x embed_dim x ...]
     t = torch.transpose(f, 1, 2)
@@ -48,7 +53,10 @@ class FuncSelfAttention(nn.Module):
       .movedim(source=3, destination=2)
     query, key, value = qkv[0], qkv[1], qkv[2]
     
-    bias = self.log_cpb(n_sub_x, n_sub_y, device=query.device)
+    if self.log_cpb is not None:
+      bias = self.log_cpb(n_sub_x, n_sub_y, device=query.device)
+    else:
+      bias = None
     sa = attention(query, key, value, bias)
     sa = self._flatten(sa)
     
