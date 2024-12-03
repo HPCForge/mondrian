@@ -10,7 +10,7 @@ def get_func(d):
   return torch.sin(2 * x + y * x).unsqueeze(0).unsqueeze(0).unsqueeze(0)
 
 def test_spectral():
-  operators = ['fno', 'ffno', 'stupid']
+  operators = ['fno', 'ffno', 'random']
 
   # operators should be fairly robust to changing discretization
   for o in operators:
