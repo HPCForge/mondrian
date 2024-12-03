@@ -1,20 +1,15 @@
 name: mondrian
 channels:
-  - numba
   - pytorch
   - nvidia
-  - pyg
 dependencies:
   - python=3.9
-  - pytorch=2.4.1
-  - pytorch-cuda=11.7
+  - pytorch=2.5.1
   - torchvision
-  - pyg
-  - pytorch-scatter
-  - pytorch-sparse
+  - pytorch-cuda=11.8
   - numpy
   - h5py
-  - numba
+  #- conda-forge::xesmf # needed for climate-learn
   - pip
   - pip:
     - hydra-core
@@ -29,5 +24,6 @@ dependencies:
     - zarr
     - opt_einsum
     - wandb
-    - torchdeq
     - einops
+    - accelerate
+    - climate-learn

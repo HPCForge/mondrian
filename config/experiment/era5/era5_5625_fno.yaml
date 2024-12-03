@@ -1,0 +1,19 @@
+name: era5
+
+data_path: '/share/crsp/lab/amowli/share/climatelearn/era5_5625/processed/'
+
+use_point: False
+
+train_workers: 8
+test_workers: 8
+
+train_cfg:
+  batch_size: 16
+  max_steps: 150000
+  pred_range: 72
+
+model_cfg:
+  name: 'fno'
+  n_modes: 32
+  hidden_channels: 64
+  num_layers: 4
