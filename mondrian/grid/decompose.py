@@ -1,4 +1,4 @@
-import torch
+import einops
 
 def decompose2d(v, n_sub_x, n_sub_y):
   r"""
@@ -15,18 +15,10 @@ def decompose2d(v, n_sub_x, n_sub_y):
   assert v.size(3) % n_sub_x == 0
   assert v.size(2) % 2 == 0
   assert v.size(3) % 2 == 0
-  
-  kernel_y = v.size(2) // n_sub_y
-  kernel_x = v.size(3) // n_sub_x
-
-  batch_size = v.size(0)
-  channels = v.size(1)
-  
-  d = v.unfold(2, kernel_y, kernel_y) \
-      .unfold(3, kernel_x, kernel_x) \
-      .permute(0, 2, 3, 1, 4, 5) \
-      .reshape(batch_size, -1, channels, kernel_y, kernel_x)
-    
+  d = einops.rearrange(v, 
+                       'b c (h1 h) (w1 w) -> b (h1 w1) c h w',
+                       h1=n_sub_y,
+                       w1=n_sub_x)
   return d
 
 def recompose2d(d, n_sub_x, n_sub_y):
@@ -42,19 +34,8 @@ def recompose2d(d, n_sub_x, n_sub_y):
     v: [batch_size x channels x ...]
   """
   assert d.dim() == 5
-  
-  batch_size = d.size(0)
-  channels = d.size(2)
-  kernel_y = d.size(3)
-  kernel_x = d.size(4)
-
-  d = torch.unflatten(d, 1, (n_sub_y, n_sub_x))
-  d = d.permute(0, 3, 4, 5, 1, 2).contiguous()
-  d = d.view(batch_size, -1, n_sub_y, n_sub_x).contiguous()
-  d = d.view(batch_size, channels * kernel_y * kernel_x, -1).contiguous()     
-  d = torch.nn.functional.fold(d, 
-                               output_size=(n_sub_y * kernel_y, n_sub_x * kernel_x), 
-                               kernel_size=(kernel_y, kernel_x),
-                               stride=(kernel_y, kernel_x))
-  
-  return d
+  v = einops.rearrange(d, 
+                       'b (h1 w1) c h w -> b c (h1 h) (w1 w)',
+                       h1=n_sub_y,
+                       w1=n_sub_x)
+  return v
