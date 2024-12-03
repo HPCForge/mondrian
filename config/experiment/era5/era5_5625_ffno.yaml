@@ -14,6 +14,7 @@ train_cfg:
 
 model_cfg:
   name: 'ffno'
-  n_modes: 32
+  n_modes: 16
   hidden_channels: 64
   num_layers: 4
+  domain_size: null

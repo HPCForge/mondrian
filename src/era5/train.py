@@ -17,7 +17,7 @@ from lightning.pytorch.loggers import WandbLogger
 
 from climate_learn.transforms import Denormalize
 
-from mondrian.models.get_model import get_model
+from mondrian.models import get_model
 from mondrian.dataset.climate_learn.era5_dataloader import (
     get_era5_dataloaders
 )
@@ -49,14 +49,15 @@ def main(cfg):
     in_channels, out_channels = 147, 3
 
     # get model
-    model = get_model(in_channels, out_channels, cfg.model_cfg)
+    model = get_model(in_channels, out_channels, cfg.experiment.model_cfg)
+    print(model)
 
     # setup lightning module
     max_steps = int(cfg.experiment.train_cfg.max_steps)    
     module = ERA5Module(
       model, 
       total_iters=max_steps,
-      domain_size=cfg.train_cfg.domain_size,
+      domain_size=cfg.experiment.model_cfg.domain_size,
       train_denormalize=denormalize,
       val_denormalize=denormalize,
       test_denormalize=denormalize)
@@ -95,9 +96,6 @@ def main(cfg):
     
     # run training
     trainer = L.Trainer(
-        accelerator='gpu',
-        # if device_count > 1, automatically uses ddp
-        devices=torch.cuda.device_count(),
         logger=logger,
         callbacks=callbacks, 
         max_steps=max_steps,

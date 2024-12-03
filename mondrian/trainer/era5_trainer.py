@@ -1,4 +1,4 @@
-from typing import Tuple, List
+from typing import Tuple, List, Optional
 
 import torch
 import torch.nn.functional as F
@@ -18,12 +18,12 @@ class ERA5Module(L.LightningModule):
     def __init__(self,
                  model,
                  total_iters,
-                 domain_size: Tuple[int, int],
                  train_denormalize,
                  val_denormalize,
                  test_denormalize,
-                 lr=0.001,
-                 weight_decay=1e-4):
+                 domain_size: Optional[Tuple[int, int]] = None,
+                 lr: float = 0.001,
+                 weight_decay: float = 1e-4):
         super().__init__()
         self.save_hyperparameters()
         self.model = model
@@ -85,7 +85,12 @@ class ERA5Module(L.LightningModule):
         return [optimizer], [scheduler_config]
 
     def forward(self, x):
-        return self.model(x, self.domain_size[0], self.domain_size[1])
+        # Some models are flexible to different domain sizes, so require it
+        # as a parameter, other models are not and do not take a parame
+        if self.domain_size is not None:
+          return self.model(x, self.domain_size[0], self.domain_size[1])
+        else:
+          return self.model(x)
 
     def training_step(self, 
                       batch: Tuple[torch.Tensor, torch.Tensor, List[str], List[str]],
