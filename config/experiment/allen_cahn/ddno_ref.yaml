@@ -3,6 +3,8 @@ name: allen_cahn
 data_path: '/share/crsp/lab/amowli/share/allen_cahn_3000.hdf5'
 model_ckpt_path: '/data/homezvol2/jackh15/mondrian/Mondrian-DDOp/checkpoints'
 use_point: False
+train_workers: 4
+test_workers: 4
 train_cfg:
   batch_size: 4
   max_epochs: 1000
