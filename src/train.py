@@ -48,8 +48,6 @@ def main(cfg):
 
     # setup callbacks
     checkpoint_callback = ModelCheckpoint(
-            dirpath=cfg.experiment.model_ckpt_path,
-            filename='{epoch}-8W-64X64-4L4H-5in5out',
             save_top_k=1,
             save_last=False,
             monitor='Val/L2Error',
@@ -73,7 +71,7 @@ def get_module(cfg, **kwargs):
     name = cfg.experiment.name
     if name in POSEIDON_DATSETS:
         return PoseidonModule
-    elif name in ('shear_layer', 'disc_transport', 'poisson'):
+    elif name in ('shear_layer', 'disc_transport', 'poisson', 'allen_cahn'):
         return RENOModule
 
 def get_datasets(cfg, dtype):

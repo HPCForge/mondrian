@@ -101,3 +101,15 @@ class FuncSelfAttention(nn.Module):
     
   def forward(self, seq, n_sub_x, n_sub_y):
     return self._forward_channel_heads(seq, n_sub_x, n_sub_y)
+  
+class WinFuncSelfAttention(FuncSelfAttention):
+  def __init__(self,
+                embed_dim: int,
+                num_heads: int,
+                use_bias: bool,
+                window_size: int):
+      super().__init__(embed_dim, num_heads, use_bias)
+      self.window_size = window_size
+      
+  def forward(self, seq):
+    return self._forward_channel_heads(seq, self.window_size, self.window_size)
