@@ -11,17 +11,26 @@ from .log_cpb import LogCPB
 from .decompose import decompose2d, recompose2d
 from .utility import is_power_of_2
 
+CHANNEL = 'channel'
+SPATIAL = 'spatial'
+HEAD_SPLIT_OPTIONS = [
+  CHANNEL, SPATIAL
+]
+
 class FuncSelfAttention(nn.Module):
   def __init__(self,
                embed_dim: int,
                num_heads: int,
+               head_split: str,
                use_bias: bool):
     super().__init__()
-    assert is_power_of_2(embed_dim)
-    assert is_power_of_2(num_heads)
+    assert head_split in HEAD_SPLIT_OPTIONS
+    assert is_power_of_2(self.num_heads)
     self.embed_dim = embed_dim
     self.num_heads = num_heads
     self.head_dim = embed_dim // num_heads
+    assert is_power_of_2(self.head_dim)
+    self.head_split = head_split
     self.use_bias = use_bias
 
     modes = 16
@@ -69,7 +78,6 @@ class FuncSelfAttention(nn.Module):
     r"""
     Computes multihead by partitioning the spatial components of the function
     """
-    assert is_power_of_2(self.num_heads)
     heads_x = int(math.sqrt(self.num_heads))  
     heads_y = int(math.sqrt(self.num_heads))
     
@@ -100,4 +108,7 @@ class FuncSelfAttention(nn.Module):
     return self.output_operator(sa)
     
   def forward(self, seq, n_sub_x, n_sub_y):
-    return self._forward_channel_heads(seq, n_sub_x, n_sub_y)
+    if self.head_split == CHANNEL:
+      return self._forward_channel_heads(seq, n_sub_x, n_sub_y)
+    if self.head_split == SPATIAL:
+      return self._forward_function_heads(seq, n_sub_x, n_sub_y)

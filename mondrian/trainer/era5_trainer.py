@@ -47,6 +47,7 @@ class ERA5Module(L.LightningModule):
       r"""
       Compute channel-wise metrics. These correspond to errors
       for the different out_vars.
+      
       All metrics are computed on denormalized data.
       """
       pred = self.train_denormalize(pred)

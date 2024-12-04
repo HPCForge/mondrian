@@ -22,11 +22,12 @@ class SequenceInstanceNorm2d(nn.Module):
 
 class Encoder(nn.Module):
   def __init__(self, 
-               embed_dim, 
+               embed_dim,
                num_heads,
+               head_split,
                use_bias):
     super().__init__()
-    self.sa = FuncSelfAttention(embed_dim, num_heads, use_bias)
+    self.sa = FuncSelfAttention(embed_dim, num_heads, head_split, use_bias)
     modes = 8
     self.spectral_conv1 = SimpleSpectralConv2d(embed_dim, embed_dim, modes)
     self.spectral_conv2 = SimpleSpectralConv2d(embed_dim, embed_dim, modes)
@@ -36,8 +37,7 @@ class Encoder(nn.Module):
     
   def _spectral(self, v):
     v = nn.functional.gelu(self.spectral_conv1(v)) + v
-    v = nn.functional.gelu(self.spectral_conv1(v)) + v
-    v = self.norm2(self.spectral_conv2(v) + v)
+    v = self.spectral_conv2(v) + v
     return v
 
   def forward(self, v, n_sub_x, n_sub_y):
@@ -51,7 +51,9 @@ class ViTOperator2d(nn.Module):
                out_channels: int,
                embed_dim: int,
                num_heads: int,
+               head_split: str,
                num_layers: int,
+               max_seq_len: int,
                subdomain_size: Union[int, Tuple[int, int]]):
     r"""
     An implementation of a ViT-style operator, specific to regular 2d grids.
@@ -60,6 +62,7 @@ class ViTOperator2d(nn.Module):
       out_channels: The number of channels output by the model. 
       embed_dim: The number of channels used in the attention operators. 
       num_heads: The number of heads used in multihead attention. 
+      head_split: way to split heads for multihead attention. ['spatial', 'channel']
       num_layers: The number of Encoder blocks.
       sub_domain_size: The physical subdomain size. This is independent of
                        the input discretization. It should correspond to some
@@ -78,13 +81,13 @@ class ViTOperator2d(nn.Module):
     self.sub_size_y = self.subdomain_size[0]
     self.sub_size_x = self.subdomain_size[1]
     
-    self.embed = nn.ModuleList([Encoder(embed_dim, num_heads, False) for _ in range(num_layers)])
+    self.embed = nn.ModuleList([Encoder(embed_dim, num_heads, head_split, False) for _ in range(num_layers)])
 
     self.input_project = PointwiseMLP2d(in_channels, embed_dim, hidden_channels=128)
     self.output_project = PointwiseMLP2d(embed_dim, out_channels, hidden_channels=128)
     
     # TODO: Maybe make this optional...
-    self.pos_embedding = FuncPosEmbedding2d(max_seq_len=64, channels=embed_dim)
+    self.pos_embedding = FuncPosEmbedding2d(max_seq_len=max_seq_len, channels=embed_dim)
     
     self.padding = DomainPadding(0.25)
 
@@ -99,7 +102,6 @@ class ViTOperator2d(nn.Module):
     Returns:
       u: [batch_size x out_channels x H x W]
     """
-    print(v.size(), self.in_channels)
     assert v.size(1) == self.in_channels
     assert isinstance(domain_size_y, int)
     assert isinstance(domain_size_x, int)
@@ -110,8 +112,7 @@ class ViTOperator2d(nn.Module):
     
     v = self.input_project(v)
     d = decompose2d(v, n_sub_x, n_sub_y)
-    p = self.pos_embedding(d.size(1), d.size(-2), d.size(-1))
-    d = d + p
+    d = self.pos_embedding(d)
     d = seq_op(self.padding.pad, d)
 
     for embed in self.embed:
