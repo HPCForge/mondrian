@@ -22,7 +22,6 @@ from mondrian.dataset.reno_shear_layer_dataset import ShearLayerDataset
 from mondrian.trainer.poseidon_trainer import PoseidonModule
 from mondrian.dataset.allen_cahn_dataset import AllenCahnDataset
 from mondrian.trainer.reno_trainer import RENOModule
-from pytorch_lightning import loggers as pl_loggers
 
 @hydra.main(version_base=None, config_path='../config', config_name='default')
 def main(cfg):
@@ -63,8 +62,7 @@ def main(cfg):
 
     # run training
 
-    tb_logger = pl_loggers.TensorBoardLogger('logs/')
-    trainer = L.Trainer(callbacks=callbacks, max_epochs=max_epochs,logger=tb_logger)
+    trainer = L.Trainer(callbacks=callbacks, max_epochs=max_epochs)
     trainer.fit(module, train_loader, val_loader)
 
 def get_module(cfg, **kwargs):
