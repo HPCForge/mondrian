@@ -31,15 +31,14 @@ def main(cfg):
     
     # run a second time to save outputs
     accum = {'Input': [], 'Label': [], 'Pred': []} 
-    for i,batch in enumerate(test_loader):
+    for batch in test_loader:
         input = batch[0]
         label = batch[-1]
         pred = module(input).detach().cpu()
         accum['Input'].append(input)
         accum['Label'].append(label)
         accum['Pred'].append(pred)
-        if i > 0:
-            break
+        
     prefix = cfg.model_ckpt_path[:-len('.ckpt')]
     pathlib.Path(prefix).mkdir(parents=True, exist_ok=True)
     print(prefix)
