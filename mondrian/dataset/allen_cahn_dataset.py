@@ -1,6 +1,6 @@
 import h5py
 import torch
-from torch.utils.data import Dataset, default_collate
+from torch.utils.data import Dataset
 
 DIFFUSIVITY = 'diffusivity'
 SOLUTION = 'solution'
