@@ -23,7 +23,8 @@ class ERA5Module(L.LightningModule):
                  test_denormalize,
                  domain_size: Optional[Tuple[int, int]] = None,
                  lr: float = 0.001,
-                 weight_decay: float = 1e-4):
+                 weight_decay: float = 1e-4,
+                 warmup_iters: int = 1000):
         super().__init__()
         self.save_hyperparameters()
         self.model = model
@@ -31,6 +32,7 @@ class ERA5Module(L.LightningModule):
         self.domain_size = domain_size
         self.lr = lr
         self.weight_decay = weight_decay
+        self.warmup_iters = warmup_iters
         
         self.train_denormalize = train_denormalize
         self.val_denormalize = val_denormalize
@@ -58,17 +60,25 @@ class ERA5Module(L.LightningModule):
         # The first [0:-1] errors are the channel-wise error corresponding to an out_var
         for out_var, idx in zip(out_vars, range(err.size(0) - 1)):
           self.log(f'{stage}/{out_var}/{metric_name}', err[idx],
-                   sync_dist=True, 
+                   sync_dist=True,
+                   on_step=False,
                    on_epoch=True,
                    prog_bar=False)
     
     def log_loss(self, label, loss):
       @rank_zero_only
       def log_to_prog_bar(label, loss):
-        self.log(f'rank0/{label}', loss, prog_bar=True)
+        self.log(f'rank0/{label}',
+                 loss,
+                 prog_bar=True)
         
       # Synchronize loss logging for early stopping
-      self.log(label, loss, prog_bar=False, on_epoch=True, sync_dist=True)
+      self.log(label, 
+               loss,
+               sync_dist=True,
+               on_step=False,
+               on_epoch=True,
+               prog_bar=False)
       # Log rank0's loss to the progress bar
       log_to_prog_bar(label, loss)
 
@@ -78,11 +88,11 @@ class ERA5Module(L.LightningModule):
                                       weight_decay=self.weight_decay)
         scheduler = WarmupCosineAnnealingLR(
                 optimizer,
-                warmup_iters=1000,
+                warmup_iters=self.warmup_iters,
                 total_iters=self.total_iters,
                 eta_min=1e-8)
         scheduler_config = {'scheduler': scheduler,
-                            'interval': 'epoch'}
+                            'interval': 'step'}
         return [optimizer], [scheduler_config]
 
     def forward(self, x):

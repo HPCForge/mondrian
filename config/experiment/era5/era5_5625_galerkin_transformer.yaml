@@ -1,0 +1,23 @@
+name: era5
+
+data_path: '/share/crsp/lab/amowli/share/climatelearn/era5_5625/processed/'
+
+use_point: False
+
+train_workers: 10
+test_workers: 10
+
+train_cfg:
+  batch_size: 128
+  max_steps: 100000
+  pred_range: 72
+  lr: 0.001
+  weight_decay: 0.01
+  warmup_iters: 1000
+
+model_cfg:
+  name: 'galerkin_transformer_2d'
+  embed_dim: 128
+  num_heads: 4
+  num_layers: 4
+  domain_size: [1, 2]

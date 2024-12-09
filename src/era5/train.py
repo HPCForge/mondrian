@@ -1,9 +1,8 @@
-from omegaconf import DictConfig, OmegaConf
+from omegaconf import OmegaConf
 import hydra
-from dataclasses import dataclass
+import math
 
 import torch
-from torch.utils.data import DataLoader
 
 import lightning as L
 from lightning.pytorch.callbacks import (
@@ -37,6 +36,13 @@ def main(cfg):
     torch.backends.cuda.matmul.allow_tf32 = False
     torch.backends.cudnn.allow_tf32 = True
 
+    # we use ddp with multiple GPUs, so the default learning
+    # rate should be scaled linearly with the number of devices.
+    device_count = torch.cuda.device_count()
+    if device_count > 0:
+        cfg.experiment.train_cfg.lr *= device_count
+        cfg.experiment.train_cfg.warmup_iters *= math.sqrt(device_count)
+
     # build experiment dataloaders
     (dm, train_loader, val_loader, test_loader) = get_dataloaders(cfg)
     
@@ -60,7 +66,10 @@ def main(cfg):
       domain_size=cfg.experiment.model_cfg.domain_size,
       train_denormalize=denormalize,
       val_denormalize=denormalize,
-      test_denormalize=denormalize)
+      test_denormalize=denormalize,
+      lr=cfg.experiment.train_cfg.lr,
+      weight_decay=cfg.experiment.train_cfg.weight_decay,
+      warmup_iters=cfg.experiment.train_cfg.warmup_iters)
 
     # setup callbacks
     checkpoint_callback = ModelCheckpoint(
@@ -71,7 +80,7 @@ def main(cfg):
     early_stopping_callback = EarlyStopping(
             monitor='Val/MSELoss',
             min_delta=0.0,
-            patience=5)
+            patience=10)
     progress_bar_callback = RichProgressBar(
         theme=RichProgressBarTheme(
             description="green_yellow",
@@ -92,7 +101,14 @@ def main(cfg):
             lr_monitor_callback
     ]
     
-    logger = WandbLogger(project='mondrian_era5_5625', offline=cfg.wandb.offline)
+    model_name = cfg.experiment.model_cfg.name
+    lr = cfg.experiment.train_cfg.lr
+    num_params = sum(p.numel() for p in model.parameters())
+    logger_name = f'{model_name}_lr={lr}_params={num_params}'
+    logger = WandbLogger(
+            name=logger_name,
+            project='mondrian_era5_5625', 
+            offline=cfg.wandb.offline)
     
     # run training
     trainer = L.Trainer(
@@ -101,7 +117,7 @@ def main(cfg):
         max_steps=max_steps,
         gradient_clip_val=0.5)
     trainer.fit(module, train_loader, val_loader)
-    trainer.test(test_loader)
+    trainer.test(module, test_loader)
 
 def get_dataloaders(cfg):
     assert cfg.experiment.name == 'era5'    
