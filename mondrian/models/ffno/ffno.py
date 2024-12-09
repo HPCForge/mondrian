@@ -9,6 +9,7 @@ import torch
 import torch.nn as nn
 from torch.nn.functional import gelu
 from einops import rearrange
+from neuralop.layers.padding import DomainPadding
 
 from .feedforward import FeedForward, Linear
 from .linear import WNLinear2d
@@ -23,6 +24,7 @@ class FNOFactorized2DBlock(nn.Module):
                  out_channels,
                  modes,
                  hidden_channels,
+                 domain_padding,
                  dropout=0.0,
                  in_dropout=0.0,
                  n_layers=4,
@@ -60,11 +62,15 @@ class FNOFactorized2DBlock(nn.Module):
             Linear(hidden_channels, 128),
             nn.GELU(),
             Linear(128, out_channels))
+        
+        self.padding = DomainPadding(domain_padding)
 
     def forward(self, x):
         x = self.lifting(x)
         x = self.in_drop(x)
+        x = self.padding.pad(x)
         for i in range(self.n_layers):
             x = gelu(self.spectral_layers[i](x)) + self.skip_layers[i](x)
+        self.padding.unpad(x)
         forecast = self.projection(x)
         return forecast

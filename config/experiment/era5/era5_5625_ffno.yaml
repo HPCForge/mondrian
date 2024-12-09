@@ -11,6 +11,9 @@ train_cfg:
   batch_size: 16
   max_steps: 150000
   pred_range: 72
+  lr: 0.001
+  weight_decay: 0.01
+  warmup_iters: 1000
 
 model_cfg:
   name: 'ffno'
@@ -18,3 +21,5 @@ model_cfg:
   hidden_channels: 64
   num_layers: 4
   domain_size: null
+  layer_norm: True
+  domain_padding: 0.25

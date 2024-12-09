@@ -8,13 +8,18 @@ train_workers: 8
 test_workers: 8
 
 train_cfg:
-  batch_size: 16
-  max_steps: 150000
+  batch_size: 128
+  max_steps: 100000
   pred_range: 72
+  lr: 0.001
+  weight_decay: 0.01
+  warmup_iters: 1000
 
 model_cfg:
   name: 'fno'
-  n_modes: [16, 16]
-  hidden_channels: 64
+  n_modes: [8, 16]
+  hidden_channels: 32
   num_layers: 4
   domain_size: null
+  norm: 'group_norm'
+  domain_padding: 0

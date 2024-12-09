@@ -4,6 +4,11 @@ import einops
 import torch
 from torch.nn.functional import softmax
 
+SCORE_METHODS = ['reimann', 'trapezoid']
+
+def left_reimann_1d(f, dx):
+  return (f[..., :-1] * dx).sum(dim=-1)
+
 def reimann_inner_product_score(u, v, p=2):
   r"""
   Computes and inner product based score. This
@@ -21,7 +26,9 @@ def reimann_inner_product_score(u, v, p=2):
   dims_to_sum = list(range(4, local_inner_product.ndim))
   if not dims_to_sum:
     return local_inner_product
-  integral = (local_inner_product / numel).sum(dim=dims_to_sum)
+  integral = local_inner_product
+  for _ in range(len(dims_to_sum)):
+    integral = left_reimann_1d(integral, dx=1/integral.size(-1))
   return integral
 
 def trapezoid_inner_product_score(u, v, p=2):
@@ -45,8 +52,16 @@ def trapezoid_inner_product_score(u, v, p=2):
     integral = torch.trapezoid(integral, dx=1/integral.size(-1))
   return integral
 
-def self_attention(query, key, value, bias: Optional[torch.Tensor]):
-  score = trapezoid_inner_product_score(query, key)
+def self_attention(query, 
+                   key, 
+                   value, 
+                   bias: Optional[torch.Tensor] = None,
+                   score_method='reimann'):
+  assert score_method in SCORE_METHODS
+  if score_method == 'reimann':
+    score = reimann_inner_product_score(query, key)
+  elif score_method == 'trapezoid':
+    score = trapezoid_inner_product_score(query, key)
   score = score / math.sqrt(query.size(3))
   if bias is not None:
     score = score + bias

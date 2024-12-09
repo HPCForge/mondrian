@@ -23,9 +23,10 @@ class WarmupCosineAnnealingLR(SequentialLR):
                total_iters,
                eta_min=0,
                last_epoch=-1):
+    assert warmup_iters < total_iters
     warmup = LinearWarmup(optimizer, warmup_iters)
     cosine = CosineAnnealingLR(
-      optimizer, 
+      optimizer,
       T_max=total_iters - warmup_iters,
       eta_min=eta_min)
     

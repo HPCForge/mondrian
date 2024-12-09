@@ -11,7 +11,10 @@ def test_vit_operator_init():
                      out_channels=32, 
                      embed_dim=16, 
                      num_heads=4, 
-                     num_layers=4, 
+                     head_split='channel',
+                     score_method='reimann',
+                     num_layers=4,
+                     max_seq_len=32,
                      subdomain_size=1)
   assert vo.subdomain_size == (1, 1)
   
@@ -19,8 +22,11 @@ def test_vit_operator_forward_device():
   vo = ViTOperator2d(in_channels=32,
                      out_channels=32, 
                      embed_dim=16, 
-                     num_heads=4, 
+                     num_heads=4,
+                     head_split='channel',
+                     score_method='reimann',
                      num_layers=4, 
+                     max_seq_len=32,
                      subdomain_size=1).to('meta')
   v = torch.ones(4, 32, 32, 32).to('meta')
   u = vo(v, 2, 2)
@@ -32,7 +38,10 @@ def test_vit_operator_forward(device):
                      out_channels=32, 
                      embed_dim=16, 
                      num_heads=4, 
-                     num_layers=4, 
+                     head_split='channel',
+                     score_method='reimann',
+                     num_layers=4,
+                     max_seq_len=32,
                      subdomain_size=1).to(device)
   v = torch.ones(4, 32, 32, 32).to(device)
   u = vo(v, 2, 2)

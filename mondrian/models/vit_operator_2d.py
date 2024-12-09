@@ -25,9 +25,10 @@ class Encoder(nn.Module):
                embed_dim,
                num_heads,
                head_split,
+               score_method,
                use_bias):
     super().__init__()
-    self.sa = FuncSelfAttention(embed_dim, num_heads, head_split, use_bias)
+    self.sa = FuncSelfAttention(embed_dim, num_heads, head_split, use_bias, score_method)
     modes = 8
     self.spectral_conv1 = SimpleSpectralConv2d(embed_dim, embed_dim, modes)
     self.spectral_conv2 = SimpleSpectralConv2d(embed_dim, embed_dim, modes)
@@ -52,11 +53,13 @@ class ViTOperator2d(nn.Module):
                embed_dim: int,
                num_heads: int,
                head_split: str,
+               score_method: str,
                num_layers: int,
                max_seq_len: int,
                subdomain_size: Union[int, Tuple[int, int]]):
     r"""
     An implementation of a ViT-style operator, specific to regular 2d grids.
+    The `head_dim` is computed as `embed_dim // num_heads`
     Parameters:
       in_channels: The expected number of channels input to the model.
       out_channels: The number of channels output by the model. 
@@ -81,7 +84,9 @@ class ViTOperator2d(nn.Module):
     self.sub_size_y = self.subdomain_size[0]
     self.sub_size_x = self.subdomain_size[1]
     
-    self.embed = nn.ModuleList([Encoder(embed_dim, num_heads, head_split, False) for _ in range(num_layers)])
+    self.encoder = nn.ModuleList([
+      Encoder(embed_dim, num_heads, head_split, score_method, False) for _ in range(num_layers)
+    ])
 
     self.input_project = PointwiseMLP2d(in_channels, embed_dim, hidden_channels=128)
     self.output_project = PointwiseMLP2d(embed_dim, out_channels, hidden_channels=128)
@@ -89,6 +94,7 @@ class ViTOperator2d(nn.Module):
     # TODO: Maybe make this optional...
     self.pos_embedding = FuncPosEmbedding2d(max_seq_len=max_seq_len, channels=embed_dim)
     
+    # parameterize...
     self.padding = DomainPadding(0.25)
 
   def forward(self, v: torch.Tensor, domain_size_y: int, domain_size_x: int):
@@ -115,8 +121,8 @@ class ViTOperator2d(nn.Module):
     d = self.pos_embedding(d)
     d = seq_op(self.padding.pad, d)
 
-    for embed in self.embed:
-      d = embed(d, n_sub_x, n_sub_y)
+    for encoder in self.encoder:
+      d = encoder(d, n_sub_x, n_sub_y)
       
     d = seq_op(self.padding.unpad, d)
     u = recompose2d(d, n_sub_x, n_sub_y)

@@ -5,7 +5,7 @@ import einops
 import torch
 from torch import nn
 
-from .fast_math import attention, is_power_of_2
+from .fast_math import attention
 from .spectral_conv import SimpleSpectralConv2d
 from .log_cpb import LogCPB
 from .decompose import decompose2d, recompose2d
@@ -22,16 +22,18 @@ class FuncSelfAttention(nn.Module):
                embed_dim: int,
                num_heads: int,
                head_split: str,
-               use_bias: bool):
+               use_bias: bool,
+               score_method: str):
     super().__init__()
     assert head_split in HEAD_SPLIT_OPTIONS
-    assert is_power_of_2(self.num_heads)
+    assert is_power_of_2(num_heads)
     self.embed_dim = embed_dim
     self.num_heads = num_heads
     self.head_dim = embed_dim // num_heads
     assert is_power_of_2(self.head_dim)
     self.head_split = head_split
     self.use_bias = use_bias
+    self.score_method = score_method
 
     modes = 16
     self.qkv_operator = SimpleSpectralConv2d(embed_dim, 3 * embed_dim, modes)
@@ -69,7 +71,7 @@ class FuncSelfAttention(nn.Module):
     else:
       bias = None
       
-    sa = attention(query, key, value, bias)
+    sa = attention(query, key, value, bias=bias, score_method=self.score_method)
     sa = self._flatten(sa)
     
     return self.output_operator(sa)
@@ -98,7 +100,7 @@ class FuncSelfAttention(nn.Module):
       s=seq_len,
       qkv=3)
     
-    sa = attention(query, key, value)    
+    sa = attention(query, key, value, bias=None, score_method=self.score_method)    
     
     # recompose subdomains
     sa = einops.rearrange(sa, 'b h s ... -> (b s) h ...')
