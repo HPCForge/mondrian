@@ -16,7 +16,10 @@ class AllenCahnDataset(Dataset):
         self.in_steps = in_steps
         self.in_channels = in_steps + 1
         self.out_channels = out_steps
-        datasize = {'training': 750, 'validation': 50, 'test': 200}
+        self.train_len = 750
+        self.val_len = 50
+        self.test_len = 200
+        datasize = {'training': self.train_len, 'validation': self.val_len, 'test': self.test_len}
         size_group_keys = list(self.f.keys())
         for size_group_key in size_group_keys:
             for sim_key in self.f[size_group_key].keys():
@@ -47,3 +50,18 @@ class AllenCahnDataset(Dataset):
             self.f[size_key][sim_key][SOLUTION][self.in_steps:self.in_steps + self.out_channels]
         ).float()
         return input, label
+
+class AllenCahnDatasetTest61(AllenCahnDataset):
+    def __init__(self, filename, in_steps=1, out_steps=30):
+        assert in_steps + out_steps <= 61
+        self.f = h5py.File(filename, 'r')
+        self.keys = []
+        # diffusivity is the extra channel
+        self.in_steps = in_steps
+        self.in_channels = in_steps + 1
+        self.out_channels = out_steps
+        size_group_keys = list(self.f.keys())
+
+        for size_group_key in size_group_keys:
+            for sim_key in self.f[size_group_key].keys():
+                self.keys.append((size_group_key, sim_key))
