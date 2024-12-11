@@ -51,17 +51,3 @@ class AllenCahnDataset(Dataset):
         ).float()
         return input, label
 
-class AllenCahnDatasetTest61(AllenCahnDataset):
-    def __init__(self, filename, in_steps=1, out_steps=30):
-        assert in_steps + out_steps <= 61
-        self.f = h5py.File(filename, 'r')
-        self.keys = []
-        # diffusivity is the extra channel
-        self.in_steps = in_steps
-        self.in_channels = in_steps + 1
-        self.out_channels = out_steps
-        size_group_keys = list(self.f.keys())
-
-        for size_group_key in size_group_keys:
-            for sim_key in self.f[size_group_key].keys():
-                self.keys.append((size_group_key, sim_key))
