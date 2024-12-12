@@ -5,10 +5,11 @@ from torch import nn
 
 from mondrian.grid.decompose import decompose2d, recompose2d
 from mondrian.grid.spectral_conv import SimpleSpectralConv2d
-from mondrian.grid.func_self_attention import FuncSelfAttention
+from mondrian.grid.attention.func_self_attention import FuncSelfAttention
 from mondrian.grid.pointwise import PointwiseMLP2d
 from mondrian.grid.seq_op import seq_op
 from mondrian.grid.pos_embedding import FuncPosEmbedding2d
+from .galerkin_transformer_2d import GalerkinTransformer2d
 
 from neuralop.layers.padding import DomainPadding
 
@@ -29,7 +30,7 @@ class Encoder(nn.Module):
                use_bias):
     super().__init__()
     self.sa = FuncSelfAttention(embed_dim, num_heads, head_split, use_bias, score_method)
-    modes = 8
+    modes = 2
     self.spectral_conv1 = SimpleSpectralConv2d(embed_dim, embed_dim, modes)
     self.spectral_conv2 = SimpleSpectralConv2d(embed_dim, embed_dim, modes)
 
@@ -38,12 +39,12 @@ class Encoder(nn.Module):
     
   def _spectral(self, v):
     v = nn.functional.gelu(self.spectral_conv1(v)) + v
-    v = self.spectral_conv2(v) + v
+    v = self.spectral_conv2(v)
     return v
 
   def forward(self, v, n_sub_x, n_sub_y):
     v = self.sa(self.norm1(v), n_sub_x, n_sub_y) + v
-    v = self._spectral(self.norm2(v)) + v    
+    v = self._spectral(self.norm2(v)) + v   
     return v
 
 class ViTOperator2d(nn.Module):
@@ -85,7 +86,7 @@ class ViTOperator2d(nn.Module):
     self.sub_size_x = self.subdomain_size[1]
     
     self.encoder = nn.ModuleList([
-      Encoder(embed_dim, num_heads, head_split, score_method, False) for _ in range(num_layers)
+      Encoder(embed_dim, num_heads, head_split, score_method, True) for _ in range(num_layers)
     ])
 
     self.input_project = PointwiseMLP2d(in_channels, embed_dim, hidden_channels=128)
@@ -118,8 +119,9 @@ class ViTOperator2d(nn.Module):
     
     v = self.input_project(v)
     d = decompose2d(v, n_sub_x, n_sub_y)
-    d = self.pos_embedding(d)
+    #d = self.pos_embedding(d)
     d = seq_op(self.padding.pad, d)
+    print(d.size())
 
     for encoder in self.encoder:
       d = encoder(d, n_sub_x, n_sub_y)
@@ -129,3 +131,56 @@ class ViTOperator2d(nn.Module):
     u = self.output_project(u)
     
     return u
+
+class ViTGalerkinEncoder(nn.Module):
+  def __init__(self, 
+               embed_dim,
+               num_heads,
+               head_split,
+               score_method,
+               use_bias):
+    super().__init__()
+    self.sa = FuncSelfAttention(embed_dim, num_heads, head_split, use_bias, score_method)
+    self.norm = SequenceInstanceNorm2d(embed_dim)
+    
+    self.gt = GalerkinTransformer2d(embed_dim, embed_dim, embed_dim, num_heads=4, num_layers=2)
+    
+  def _spectral(self, v):
+    v = nn.functional.gelu(self.spectral_conv1(v)) + v
+    v = self.spectral_conv2(v)
+    return v
+
+  def forward(self, v, n_sub_x, n_sub_y):
+    v = self.sa(self.norm1(v), n_sub_x, n_sub_y) + v
+    v = self._spectral(self.norm2(v)) + v   
+    return v
+
+class ViTGalerkinOperator2d(ViTOperator2d):
+  r"""
+  Same as the ViTOperator, but uses a Galerkin Transformer in subdomains
+  """
+  def __init__(self,
+               in_channels: int,
+               out_channels: int,
+               embed_dim: int,
+               num_heads: int,
+               head_split: str,
+               score_method: str,
+               num_layers: int,
+               max_seq_len: int,
+               subdomain_size: Union[int, Tuple[int, int]]):
+    super().__init__(
+      in_channels,
+      out_channels,
+      embed_dim,
+      num_heads,
+      head_split,
+      score_method,
+      num_layers,
+      max_seq_len,
+      subdomain_size
+    )
+
+    self.encoder = nn.ModuleList([
+      Encoder(embed_dim, num_heads, head_split, score_method, True) for _ in range(num_layers)
+    ])

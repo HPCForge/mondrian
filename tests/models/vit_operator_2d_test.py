@@ -12,7 +12,7 @@ def test_vit_operator_init():
                      embed_dim=16, 
                      num_heads=4, 
                      head_split='channel',
-                     score_method='reimann',
+                     score_method='trapezoid',
                      num_layers=4,
                      max_seq_len=32,
                      subdomain_size=1)
@@ -24,7 +24,7 @@ def test_vit_operator_forward_device():
                      embed_dim=16, 
                      num_heads=4,
                      head_split='channel',
-                     score_method='reimann',
+                     score_method='trapezoid',
                      num_layers=4, 
                      max_seq_len=32,
                      subdomain_size=1).to('meta')
@@ -39,7 +39,7 @@ def test_vit_operator_forward(device):
                      embed_dim=16, 
                      num_heads=4, 
                      head_split='channel',
-                     score_method='reimann',
+                     score_method='trapezoid',
                      num_layers=4,
                      max_seq_len=32,
                      subdomain_size=1).to(device)

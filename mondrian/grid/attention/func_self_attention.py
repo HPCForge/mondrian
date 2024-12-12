@@ -5,17 +5,15 @@ import einops
 import torch
 from torch import nn
 
-from .fast_math import attention
-from .spectral_conv import SimpleSpectralConv2d
-from .log_cpb import LogCPB
-from .decompose import decompose2d, recompose2d
-from .utility import is_power_of_2
+from .functional.func_attention import func_attention
+from ..spectral_conv import SimpleSpectralConv2d
+from ..log_cpb import LogCPB
+from ..decompose import decompose2d, recompose2d
+from ..utility import is_power_of_2
+from ..quadrature import Quadrature2d
+from ...constants import HEAD_SPLIT_OPTIONS, CHANNEL, SPATIAL
 
-CHANNEL = 'channel'
-SPATIAL = 'spatial'
-HEAD_SPLIT_OPTIONS = [
-  CHANNEL, SPATIAL
-]
+from .galerkin_self_attention import GalerkinSubdomainSA
 
 class FuncSelfAttention(nn.Module):
   def __init__(self,
@@ -23,7 +21,7 @@ class FuncSelfAttention(nn.Module):
                num_heads: int,
                head_split: str,
                use_bias: bool,
-               score_method: str):
+               quadrature_method: str):
     super().__init__()
     assert head_split in HEAD_SPLIT_OPTIONS
     assert is_power_of_2(num_heads)
@@ -33,20 +31,23 @@ class FuncSelfAttention(nn.Module):
     assert is_power_of_2(self.head_dim)
     self.head_split = head_split
     self.use_bias = use_bias
-    self.score_method = score_method
+    self.score_method = quadrature_method
 
-    modes = 16
-    self.qkv_operator = SimpleSpectralConv2d(embed_dim, 3 * embed_dim, modes)
+    modes = 2
+    #self.qkv_operator = SimpleSpectralConv2d(embed_dim, 3 * embed_dim, modes)
     self.output_operator = SimpleSpectralConv2d(embed_dim, embed_dim, modes)
+    
     if use_bias:
       self.log_cpb = LogCPB(embed_dim, num_heads) 
     else:
       self.log_cpb = None
+      
+    self.quadrature = Quadrature2d(quadrature_method)
     
   def _qkv(self, v):
     dims = [1 for _ in range(v.dim())]
     dims[2] = 3
-    v = self.qkv_operator(v) + v.repeat(dims)
+    v = self.qkv_operator(v)# + v.repeat(dims)
     return v
   
   def _flatten(self, f):
@@ -70,8 +71,15 @@ class FuncSelfAttention(nn.Module):
       bias = self.log_cpb(n_sub_x, n_sub_y, device=query.device)
     else:
       bias = None
-      
-    sa = attention(query, key, value, bias=bias, score_method=self.score_method)
+
+    quadrature_weights = self.quadrature(query)
+    sa = func_attention(
+      query, 
+      key, 
+      value, 
+      quadrature_weights,
+      bias=bias, 
+    )        
     sa = self._flatten(sa)
     
     return self.output_operator(sa)
@@ -100,7 +108,14 @@ class FuncSelfAttention(nn.Module):
       s=seq_len,
       qkv=3)
     
-    sa = attention(query, key, value, bias=None, score_method=self.score_method)    
+    quadrature_weights = self.quadrature(query)
+    sa = func_attention(
+      query, 
+      key, 
+      value, 
+      quadrature_weights,
+      bias=None, 
+    )    
     
     # recompose subdomains
     sa = einops.rearrange(sa, 'b h s ... -> (b s) h ...')
@@ -110,6 +125,14 @@ class FuncSelfAttention(nn.Module):
     return self.output_operator(sa)
     
   def forward(self, seq, n_sub_x, n_sub_y):
+    r"""
+    Args:
+      seq: [batch, seq, channels, ...], a sequence of functions
+      n_sub_x: number of subdomains in the x-direction
+      n_sub_y: number of subdomains in the y-direction
+    Returns:
+      [batch, seq, channels, ...]
+    """
     if self.head_split == CHANNEL:
       return self._forward_channel_heads(seq, n_sub_x, n_sub_y)
     if self.head_split == SPATIAL:
