@@ -10,13 +10,9 @@ from mondrian_lib.fdm.kernel.nonlinear import NonLinearKernel
 from mondrian_lib.fdm.kernel.linear import LinearKernel
 from mondrian_lib.fdm.kernel.nystrom_nonlinear import NystromNonLinearKernel
 
+
 class DDFNO(nn.Module):
-    def __init__(
-        self,
-        in_channels,
-        out_channels,
-        n_modes
-    ):
+    def __init__(self, in_channels, out_channels, n_modes):
         super().__init__()
         self.n_dim = len(n_modes)
 
@@ -28,7 +24,16 @@ class DDFNO(nn.Module):
 
         self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
-        self.ln = [MLP(self.hidden_channels, self.hidden_channels, self.hidden_channels, n_layers=1, n_dim=self.n_dim).to(self.device) for _ in range(3)]
+        self.ln = [
+            MLP(
+                self.hidden_channels,
+                self.hidden_channels,
+                self.hidden_channels,
+                n_layers=1,
+                n_dim=self.n_dim,
+            ).to(self.device)
+            for _ in range(3)
+        ]
 
         DDOp = DDOpAdditive
 
@@ -48,11 +53,17 @@ class DDFNO(nn.Module):
         )
 
         def dd_op(use_coarse_op=True):
-            return DDOp(SpectralConv(self.hidden_channels,
-                                     self.hidden_channels, 
-                                     n_modes),
-                        self.hidden_channels, 1, 1, 0.2, 0.2, use_coarse_op=use_coarse_op, use_padding=True)
-        
+            return DDOp(
+                SpectralConv(self.hidden_channels, self.hidden_channels, n_modes),
+                self.hidden_channels,
+                1,
+                1,
+                0.2,
+                0.2,
+                use_coarse_op=use_coarse_op,
+                use_padding=True,
+            )
+
         self.scn = [dd_op().to(self.device) for _ in range(3)]
 
     def forward(self, x, injection=None, xlim=None, ylim=None):

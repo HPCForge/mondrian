@@ -3,31 +3,32 @@ from torch import nn
 
 import einops
 
+
 class PointwiseLinear(nn.Module):
-  def __init__(self, in_channels, out_channels):
-    super().__init__()
-    self.linear = nn.Linear(in_channels, out_channels)
-    
-  def forward(self, v):
-    r"""
-    Args:
-      v: [batch_size x channels x ...]
-    """
-    return einops.einsum(
-      self.linear.weight, v, 'o i, b i ... -> b o ...')
-  
+    def __init__(self, in_channels, out_channels):
+        super().__init__()
+        self.linear = nn.Linear(in_channels, out_channels)
+
+    def forward(self, v):
+        r"""
+        Args:
+          v: [batch_size x channels x ...]
+        """
+        return einops.einsum(self.linear.weight, v, "o i, b i ... -> b o ...")
+
+
 class PointwiseMLP2d(nn.Module):
-  def __init__(self, in_channels, out_channels, hidden_channels):
-    super().__init__()
-    self.seq = nn.Sequential(
-      nn.Conv2d(in_channels, hidden_channels, kernel_size=(1, 1)),
-      nn.GELU(),
-      nn.Conv2d(hidden_channels, out_channels, kernel_size=(1, 1))
-    )
-  
-  def forward(self, v):
-    r"""
-    Args:
-      v: [batch_size x channels x H x W]
-    """
-    return self.seq(v)
+    def __init__(self, in_channels, out_channels, hidden_channels):
+        super().__init__()
+        self.seq = nn.Sequential(
+            nn.Conv2d(in_channels, hidden_channels, kernel_size=(1, 1)),
+            nn.GELU(),
+            nn.Conv2d(hidden_channels, out_channels, kernel_size=(1, 1)),
+        )
+
+    def forward(self, v):
+        r"""
+        Args:
+          v: [batch_size x channels x H x W]
+        """
+        return self.seq(v)

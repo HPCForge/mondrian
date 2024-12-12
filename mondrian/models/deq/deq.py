@@ -22,7 +22,15 @@ from mondrian_lib.fdm.commons import SpectralConv2d, MLP2d
 # This is using code from the FNO-DEQ Paper
 class BasicBlock(nn.Module):
     # Note: parametrizing with a single layer-- might have to use more layers if this doesn't work well
-    def __init__(self, modes1, modes2, width, add_mlp=False, normalize=False, activation=F.gelu):
+    def __init__(
+        self,
+        modes1,
+        modes2,
+        width,
+        add_mlp=False,
+        normalize=False,
+        activation=F.gelu,
+    ):
         super(BasicBlock, self).__init__()
 
         self.modes1 = modes1
@@ -103,7 +111,15 @@ class StackedBasicBlock(nn.Module):
 
         blocks = []
         for _ in range(depth):
-            blocks.append(BasicBlock(self.modes1, self.modes2, self.width, add_mlp=add_mlp, normalize=normalize))
+            blocks.append(
+                BasicBlock(
+                    self.modes1,
+                    self.modes2,
+                    self.width,
+                    add_mlp=add_mlp,
+                    normalize=normalize,
+                )
+            )
 
         self.deq_block = nn.ModuleList(blocks)
 
@@ -119,19 +135,21 @@ class DEQ_DDFNO(nn.Module):
     CTOR:
     """
 
-    def __init__(self,
-                 in_channels,
-                 out_channels,
-                 pretraining_steps,
-                 pretrain_iter_steps,
-                 projected_gradient,
-                 pg_steps,
-                 f_max_iter,
-                 f_thresh,
-                 b_max_iter,
-                 b_thresh,
-                 device,
-                 n_modes):
+    def __init__(
+        self,
+        in_channels,
+        out_channels,
+        pretraining_steps,
+        pretrain_iter_steps,
+        projected_gradient,
+        pg_steps,
+        f_max_iter,
+        f_thresh,
+        b_max_iter,
+        b_thresh,
+        device,
+        n_modes,
+    ):
 
         super().__init__()
         self.n_dim = len(n_modes)
@@ -157,31 +175,39 @@ class DEQ_DDFNO(nn.Module):
         self.in_channels = in_channels
         self.out_channels = out_channels
 
-        self.conv = SpectralConv2d(self.hidden_channels, self.hidden_channels, n_modes[0], n_modes[1])
+        self.conv = SpectralConv2d(
+            self.hidden_channels, self.hidden_channels, n_modes[0], n_modes[1]
+        )
         self.w0 = nn.Conv2d(self.hidden_channels, self.hidden_channels, 1)
 
-        self.fnodeq = StackedBasicBlock(modes1=n_modes[0],
-                                        modes2=n_modes[1],
-                                        width=self.hidden_channels,
-                                        depth=3,
-                                        add_mlp=False,
-                                        normalize=False)
+        self.fnodeq = StackedBasicBlock(
+            modes1=n_modes[0],
+            modes2=n_modes[1],
+            width=self.hidden_channels,
+            depth=3,
+            add_mlp=False,
+            normalize=False,
+        )
 
         # self.ddfno = DDFNO(self.hidden_channels, self.hidden_channels, n_modes).float().to(self.device)
 
         self.deq_mode = False
 
-        self.m1 = MLP(in_channels=self.in_channels,
-                      out_channels=self.hidden_channels,
-                      hidden_channels=self.hidden_channels,
-                      n_layers=2,
-                      n_dim=self.n_dim)
+        self.m1 = MLP(
+            in_channels=self.in_channels,
+            out_channels=self.hidden_channels,
+            hidden_channels=self.hidden_channels,
+            n_layers=2,
+            n_dim=self.n_dim,
+        )
 
-        self.m2 = MLP(in_channels=self.hidden_channels,
-                      out_channels=self.out_channels,
-                      hidden_channels=self.hidden_channels,
-                      n_layers=2,
-                      n_dim=self.n_dim)
+        self.m2 = MLP(
+            in_channels=self.hidden_channels,
+            out_channels=self.out_channels,
+            hidden_channels=self.hidden_channels,
+            n_layers=2,
+            n_dim=self.n_dim,
+        )
 
     def forward(self, x):
 
@@ -200,12 +226,14 @@ class DEQ_DDFNO(nn.Module):
 
         if self.deq_mode:
             with torch.no_grad():
-                re = self.f_solver(f,
-                                   z1,
-                                   name="forward",
-                                   stop_mode='abs',
-                                   eps=1e-3,
-                                   f_thresh=self.f_thresh)
+                re = self.f_solver(
+                    f,
+                    z1,
+                    name="forward",
+                    stop_mode="abs",
+                    eps=1e-3,
+                    f_thresh=self.f_thresh,
+                )
                 z1 = re[0]
                 next_z1 = z1
         else:
@@ -218,15 +246,19 @@ class DEQ_DDFNO(nn.Module):
 
             if self.training:
                 if self.projected_gradient:
+
                     def bhook(grad):
                         if self.hook is not None:
                             self.hook.remove()
                             torch.cuda.synchronize()
-                        result = self.b_solver(lambda y: autograd.grad(next_z1, z1, y, retain_graph=True)[0] + grad,
-                                               torch.zeros_like(grad),
-                                               name="backward",
-                                               eps=1e-3,
-                                               threshold=self.b_thresh)
+                        result = self.b_solver(
+                            lambda y: autograd.grad(next_z1, z1, y, retain_graph=True)[0]
+                            + grad,
+                            torch.zeros_like(grad),
+                            name="backward",
+                            eps=1e-3,
+                            threshold=self.b_thresh,
+                        )
                         return result[0]
 
                     self.hook = next_z1.register_hook(bhook)
@@ -242,5 +274,6 @@ class DEQ_DDFNO(nn.Module):
         x = x1 + x2
         x = self.m2(x)
 
-        if debug: print("DEQ_DDFNO: Forward() Return")
+        if debug:
+            print("DEQ_DDFNO: Forward() Return")
         return x

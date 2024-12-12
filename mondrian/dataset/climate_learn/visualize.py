@@ -7,20 +7,25 @@ import matplotlib.animation as animation
 import numpy as np
 from scipy.stats import rankdata
 from tqdm import tqdm
-from climate_learn.data.processing.era5_constants import VAR_TO_UNIT as ERA5_VAR_TO_UNIT
-from climate_learn.data.processing.cmip6_constants import VAR_TO_UNIT as CMIP6_VAR_TO_UNIT
+from climate_learn.data.processing.era5_constants import (
+    VAR_TO_UNIT as ERA5_VAR_TO_UNIT,
+)
+from climate_learn.data.processing.cmip6_constants import (
+    VAR_TO_UNIT as CMIP6_VAR_TO_UNIT,
+)
 
 
 def visualize_at_index(
-        mm, 
-        dm, 
-        in_transform, 
-        out_transform, 
-        out_variable,
-        variable_type, 
-        src,
-        save_path,
-        index=0):
+    mm,
+    dm,
+    in_transform,
+    out_transform,
+    out_variable,
+    variable_type,
+    src,
+    save_path,
+    index=0,
+):
     lat, lon = dm.get_lat_lon()
     extent = [lon.min(), lon.max(), lat.min(), lat.max()]
     channel = dm.hparams.out_vars.index(out_variable)
@@ -82,7 +87,7 @@ def visualize_at_index(
         )
         in_fig.colorbar(in_ax.get_images()[0], cax=cax)
         anim = animation.ArtistAnimation(in_fig, imgs, interval=1000, repeat_delay=2000)
-        anim.save(f'{save_path}/{out_variable}/input_{index}.gif')
+        anim.save(f"{save_path}/{out_variable}/input_{index}.gif")
         plt.close()
     else:
         if dm.hparams.task == "downscaling":
@@ -101,7 +106,7 @@ def visualize_at_index(
     if src == "era5":
         yy = np.flip(yy, 0)
     visualize_sample(yy, extent, f"Ground truth: {variable_with_units}")
-    plt.savefig(f'{save_path}/{out_variable}/label_{index}')
+    plt.savefig(f"{save_path}/{out_variable}/label_{index}")
 
     # Plot the prediction
     ppred = out_transform(pred[adj_index])
@@ -109,16 +114,17 @@ def visualize_at_index(
     if src == "era5":
         ppred = np.flip(ppred, 0)
     visualize_sample(ppred, extent, f"Prediction: {variable_with_units}")
-    plt.savefig(f'{save_path}/{out_variable}/pred_{index}')
+    plt.savefig(f"{save_path}/{out_variable}/pred_{index}")
 
     # Plot the bias
     bias = ppred - yy
     visualize_sample(bias, extent, f"Bias: {variable_with_units}")
-    plt.savefig(f'{save_path}/{out_variable}/pred_bias_{index}')
+    plt.savefig(f"{save_path}/{out_variable}/pred_bias_{index}")
 
     # None, if no history
     return anim
-  
+
+
 def visualize_sample(img, extent, title):
     fig, ax = plt.subplots()
     ax.set_title(title)

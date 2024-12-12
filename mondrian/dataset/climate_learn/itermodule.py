@@ -29,6 +29,7 @@ from .iterdataset import (
     ShuffleIterableDataset,
 )
 
+
 class IterDataModule(L.LightningDataModule):
     """ClimateLearn's iter data module interface. Encapsulates dataset/task-specific
     data modules."""
@@ -52,7 +53,7 @@ class IterDataModule(L.LightningDataModule):
         batch_size=64,
         num_workers=0,
         pin_memory=False,
-        persistent_workers=False
+        persistent_workers=False,
     ):
         super().__init__()
         self.save_hyperparameters(logger=False)
@@ -295,9 +296,7 @@ def collate_fn(batch):
         if key == "2m_temperature_extreme_mask":
             has_extreme_mask = True
     if not has_extreme_mask:
-        out = torch.stack(
-            [handle_dict_features(batch[i][1]) for i in range(len(batch))]
-        )
+        out = torch.stack([handle_dict_features(batch[i][1]) for i in range(len(batch))])
         variables = list(batch[0][0].keys())
         out_variables = list(batch[0][1].keys())
         return inp, out, variables, out_variables
