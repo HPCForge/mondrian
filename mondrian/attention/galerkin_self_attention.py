@@ -6,16 +6,20 @@ import torch
 from torch import nn
 
 from .functional.galerkin import galerkin_attention
-from ..utility import grid
+from ..utility import cell_centered_grid
+from ..quadrature import Quadrature2d
 
 
+@torch.compile
 class GalerkinSelfAttention(nn.Module):
-    def __init__(self, embed_dim, num_heads):
+    def __init__(self, embed_dim, out_dim, num_heads, layer_norm=True):
         super().__init__()
         assert embed_dim % num_heads == 0
         self.embed_dim = embed_dim
         self.num_heads = num_heads
         self.head_dim = embed_dim // num_heads
+        self.out_dim = out_dim
+        self.layer_norm = layer_norm
 
         # These are not packed because of the initialization.
         self.wq = nn.Linear(embed_dim, embed_dim, bias=False)
@@ -26,10 +30,11 @@ class GalerkinSelfAttention(nn.Module):
         self._linear_init(self.wv.weight.data)
 
         # output operator
-        self.wo = nn.Linear(embed_dim, embed_dim)
+        self.wo = nn.Linear(embed_dim, out_dim)
 
-        self.ln_key = nn.LayerNorm(self.head_dim)
-        self.ln_value = nn.LayerNorm(self.head_dim)
+        if self.layer_norm:
+            self.ln_key = nn.LayerNorm(self.head_dim)
+            self.ln_value = nn.LayerNorm(self.head_dim)
 
     def _linear_init(self, data):
         r"""
@@ -45,7 +50,7 @@ class GalerkinSelfAttention(nn.Module):
             diagonal_view = torch.diagonal(data)
             diagonal_view += delta
 
-    def forward(self, seq):
+    def forward(self, seq, quadrature_weights=None):
         r"""
         Args:
           x: [batch, seq, embed]
@@ -57,34 +62,38 @@ class GalerkinSelfAttention(nn.Module):
         key = einops.rearrange(self.wk(seq), rearrange_str, heads=self.num_heads)
         value = einops.rearrange(self.wv(seq), rearrange_str, heads=self.num_heads)
 
-        key = self.ln_key(key)
-        value = self.ln_value(value)
-        ga_heads = galerkin_attention(query, key, value)
+        if self.layer_norm:
+            key = self.ln_key(key)
+            value = self.ln_value(value)
+
+        ga_heads = galerkin_attention(
+            query, key, value, quadrature_weights=quadrature_weights
+        )
         ga = einops.rearrange(ga_heads, "b heads s dim -> b s (heads dim)")
         ga = self.wo(ga)
         return ga
 
 
 class GalerkinSubdomainSA(nn.Module):
-    def __init__(self, embed_dim, num_heads):
+    def __init__(self, embed_dim, out_dim, num_heads, method):
         super().__init__()
-        self.ga = GalerkinSelfAttention(embed_dim + 2, num_heads)
+        self.ga = GalerkinSelfAttention(embed_dim + 2, out_dim, num_heads, False)
+        self.quadrature = Quadrature2d(method)
 
     def forward(self, seq):
         batch = seq.size(0)
         seq_len = seq.size(1)
-        channels = seq.size(2)
-
         height = seq.size(-2)
         width = seq.size(-1)
 
         # add point-wise positions, since always on subdomain can use (1, 1)
-        g = grid((height, width), (1, 1)).to(seq.device)
+        g = cell_centered_grid((height, width), (1, 1), seq.device)
         g = einops.repeat(g, "... -> b s ...", b=seq.size(0), s=seq_len)
-        seq = torch.cat((g, seq), dim=1)
+        seq = torch.cat((g, seq), dim=2)
+        # quadrature_weights = self.quadrature(seq)
 
         seq = einops.rearrange(seq, "b s c h w -> (b s) (h w) c")
-        seq = self.ga(seq)
+        seq = self.ga(seq, None)
         seq = einops.rearrange(
             seq,
             "(b s) (h w) c -> b s c h w",

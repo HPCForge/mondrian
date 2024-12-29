@@ -16,6 +16,7 @@ from ...constants import HEAD_SPLIT_OPTIONS, CHANNEL, SPATIAL
 from .galerkin_self_attention import GalerkinSubdomainSA
 
 
+@torch.compile
 class FuncSelfAttention(nn.Module):
     def __init__(
         self,
@@ -37,8 +38,14 @@ class FuncSelfAttention(nn.Module):
         self.score_method = quadrature_method
 
         modes = 2
-        # self.qkv_operator = SimpleSpectralConv2d(embed_dim, 3 * embed_dim, modes)
+        self.qkv_operator = SimpleSpectralConv2d(embed_dim, 3 * embed_dim, modes)
         self.output_operator = SimpleSpectralConv2d(embed_dim, embed_dim, modes)
+        # self.qkv_operator = GalerkinSubdomainSA(
+        #    embed_dim, 3 * embed_dim, num_heads=1, method=quadrature_method
+        # )
+        # self.output_operator = GalerkinSubdomainSA(
+        #    embed_dim, embed_dim, num_heads=1, method=quadrature_method
+        # )
 
         if use_bias:
             self.log_cpb = LogCPB(embed_dim, num_heads)
@@ -50,14 +57,8 @@ class FuncSelfAttention(nn.Module):
     def _qkv(self, v):
         dims = [1 for _ in range(v.dim())]
         dims[2] = 3
-        v = self.qkv_operator(v)  # + v.repeat(dims)
+        v = self.qkv_operator(v)
         return v
-
-    def _flatten(self, f):
-        # [batch x seq x heads x embed_dim x ...]
-        t = torch.transpose(f, 1, 2)
-        # [batch x seq x (heads x embed_dim)]
-        return torch.flatten(t, start_dim=2, end_dim=3)
 
     def _forward_channel_heads(self, seq, n_sub_x, n_sub_y):
         r"""
@@ -84,49 +85,7 @@ class FuncSelfAttention(nn.Module):
             quadrature_weights,
             bias=bias,
         )
-        sa = self._flatten(sa)
-
-        return self.output_operator(sa)
-
-    def _forward_function_heads(self, seq, n_sub_x, n_sub_y):
-        r"""
-        Computes multihead by partitioning the spatial components of the function
-        """
-        heads_x = int(math.sqrt(self.num_heads))
-        heads_y = int(math.sqrt(self.num_heads))
-
-        batch_size = seq.size(0)
-        seq_len = seq.size(1)
-
-        # [batch_size x seq_len x (3 x embed_dim) x ...]
-        qkv = self._qkv(seq)
-        # View: [(batch_size x seq_len) x (3 x embed_dim) x ...]
-        qkv_flat = torch.flatten(qkv, start_dim=0, end_dim=1)
-        # [(batch_size x seq_len) x heads x (3 x embed_dim) x ...]
-        qkv_heads = decompose2d(qkv_flat, heads_x, heads_y)
-
-        query, key, value = einops.rearrange(
-            qkv_heads,
-            "(b s) num_heads (qkv e) ... -> qkv b num_heads s e ...",
-            b=batch_size,
-            s=seq_len,
-            qkv=3,
-        )
-
-        quadrature_weights = self.quadrature(query)
-        sa = func_attention(
-            query,
-            key,
-            value,
-            quadrature_weights,
-            bias=None,
-        )
-
-        # recompose subdomains
-        sa = einops.rearrange(sa, "b h s ... -> (b s) h ...")
-        sa = recompose2d(sa, heads_x, heads_y)
-        sa = einops.rearrange(sa, "(b s) e ... -> b s e ...", b=batch_size, s=seq_len)
-
+        sa = einops.rearrange(sa, "b h s d ... -> b s (h d) ...")
         return self.output_operator(sa)
 
     def forward(self, seq, n_sub_x, n_sub_y):
@@ -138,7 +97,4 @@ class FuncSelfAttention(nn.Module):
         Returns:
           [batch, seq, channels, ...]
         """
-        if self.head_split == CHANNEL:
-            return self._forward_channel_heads(seq, n_sub_x, n_sub_y)
-        if self.head_split == SPATIAL:
-            return self._forward_function_heads(seq, n_sub_x, n_sub_y)
+        return self._forward_channel_heads(seq, n_sub_x, n_sub_y)
