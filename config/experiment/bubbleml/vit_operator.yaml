@@ -1,0 +1,26 @@
+name: bubbleml
+
+train_data_path: '/pub/afeeney/Level-Set-Study/simulation/SubcooledBoiling/Train/train_fix_fix.hdf5'
+val_data_path: '/pub/afeeney/Level-Set-Study/simulation/SubcooledBoiling/Val/val_fix_fix.hdf5'
+test_data_path: '/pub/afeeney/Level-Set-Study/simulation/SubcooledBoiling/Test/test_fix_fix.hdf5'
+
+train_workers: 8
+test_workers: 8
+
+train_cfg:
+  batch_size: 128
+  max_steps: 10000
+  lr: 0.001
+  weight_decay: 0.01
+  warmup_iters: 2000
+
+model_cfg:
+  name: 'vit_operator_2d'
+  embed_dim: 128
+  num_heads: 8
+  head_split: 'channel'
+  score_method: 'reimann'
+  num_layers: 4
+  max_seq_len: 16
+  subdomain_size: [1, 1]
+  domain_size: [4, 4]

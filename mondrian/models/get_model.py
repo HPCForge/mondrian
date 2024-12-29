@@ -1,16 +1,18 @@
 from neuralop.models import FNO
 
-from .vit_operator_2d import ViTOperator2d
-from .galerkin_transformer_2d import GalerkinTransformer2d
+from .transformer.vit_operator_2d import ViTOperator2d
+from .transformer.galerkin_transformer_2d import GalerkinTransformer2d
+from .transformer.point_transformer_2d import PointTransformer2d
 from .ffno.ffno import FNOFactorized2DBlock
 
 _VIT_OPERATOR_2D = "vit_operator_2d"
 _GALERKIN_TRANSFORMER_2D = "galerkin_transformer_2d"
+_POINT_TRANSFORMER_2D = "point_transformer_2d"
 
 _FNO = "fno"
 _FFNO = "ffno"
 
-MODELS = [_VIT_OPERATOR_2D, _GALERKIN_TRANSFORMER_2D, _FNO, _FFNO]
+MODELS = [_VIT_OPERATOR_2D, _GALERKIN_TRANSFORMER_2D, _POINT_TRANSFORMER_2D, _FNO, _FFNO]
 
 
 def get_model(in_channels, out_channels, model_cfg):
@@ -29,6 +31,15 @@ def get_model(in_channels, out_channels, model_cfg):
         )
     if model_cfg.name == _GALERKIN_TRANSFORMER_2D:
         return GalerkinTransformer2d(
+            in_channels,
+            out_channels,
+            embed_dim=model_cfg.embed_dim,
+            num_heads=model_cfg.num_heads,
+            num_layers=model_cfg.num_layers,
+            quadrature_method=model_cfg.quadrature_method,
+        )
+    if model_cfg.name == _POINT_TRANSFORMER_2D:
+        return PointTransformer2d(
             in_channels,
             out_channels,
             embed_dim=model_cfg.embed_dim,

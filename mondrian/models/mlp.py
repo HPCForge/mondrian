@@ -18,6 +18,7 @@ class MLP(nn.Module):
         self.layers.append(nn.Linear(in_dim, out_dim))
         self.layers.append(nn.GELU())
 
+    @torch.compile
     def forward(self, x):
         for layer in self.layers:
             x = layer(x)

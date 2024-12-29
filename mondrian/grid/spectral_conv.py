@@ -152,28 +152,28 @@ class RandomProjectionConv2d(nn.Module):
         return F.interpolate(
             self.down_x_func.unsqueeze(0).unsqueeze(0),
             size=(res, self.inner_dim),
-            mode="bilinear",
+            mode="bicubic",
         ).squeeze()
 
     def _get_down_y(self, res):
         return F.interpolate(
             self.down_y_func.unsqueeze(0).unsqueeze(0),
             size=(res, self.inner_dim),
-            mode="bilinear",
+            mode="bicubic",
         ).squeeze()
 
     def _get_up_x(self, res):
         return F.interpolate(
             self.up_x_func.unsqueeze(0).unsqueeze(0),
             size=(res, self.inner_dim),
-            mode="bilinear",
+            mode="bicubic",
         ).squeeze()
 
     def _get_up_y(self, res):
         return F.interpolate(
             self.up_y_func.unsqueeze(0).unsqueeze(0),
             size=(res, self.inner_dim),
-            mode="bilinear",
+            mode="bicubic",
         ).squeeze()
 
     def forward(self, x):

@@ -7,24 +7,36 @@ import einops
 from mondrian.grid.attention.galerkin_self_attention import (
     GalerkinSelfAttention,
 )
-from mondrian.grid.utility import grid
-from .mlp import MLP
+from mondrian.grid.quadrature import Quadrature2d
+from mondrian.grid.utility import cell_centered_grid
+from mondrian.models.mlp import MLP
 
 
 class GalerkinEncoder(nn.Module):
     def __init__(self, embed_dim, num_heads):
         super().__init__()
-        self.attn = GalerkinSelfAttention(embed_dim, num_heads)
+        self.attn = GalerkinSelfAttention(
+            embed_dim, embed_dim, num_heads, layer_norm=True
+        )
         self.mlp = MLP(embed_dim, embed_dim, embed_dim, num_layers=2)
 
-    def forward(self, x):
-        x = self.attn(x) + x
-        x = self.mlp(x) + x
-        return x
+    def forward(self, seq, quadrature_weights):
+        # normalization is applied to K and V inside attn.
+        seq = self.attn(seq, quadrature_weights) + seq
+        seq = self.mlp(seq) + seq
+        return seq
 
 
 class GalerkinTransformer2d(nn.Module):
-    def __init__(self, in_channels, out_channels, embed_dim, num_heads, num_layers):
+    def __init__(
+        self,
+        in_channels,
+        out_channels,
+        embed_dim,
+        num_heads,
+        num_layers,
+        quadrature_method,
+    ):
         assert embed_dim % num_heads == 0
         super().__init__()
         self.in_channels = in_channels
@@ -36,6 +48,8 @@ class GalerkinTransformer2d(nn.Module):
         self.encoders = nn.ModuleList(
             [GalerkinEncoder(embed_dim, num_heads) for _ in range(num_layers)]
         )
+
+        self.quadrature = Quadrature2d(quadrature_method)
 
     def forward(self, x, domain_size_x, domain_size_y):
         r"""
@@ -49,8 +63,12 @@ class GalerkinTransformer2d(nn.Module):
         height = x.size(2)
         width = x.size(3)
 
-        # add point-wise positions
-        g = grid((height, width), (domain_size_y, domain_size_x)).to(x.device)
+        quadrature_weights = self.quadrature(x).flatten()
+
+        # concatenate point-wise positions
+        g = cell_centered_grid(
+            (height, width), (domain_size_y, domain_size_x), device=x.device
+        )
         g = einops.repeat(g, "... -> b ...", b=x.size(0))
         x = torch.cat((g, x), dim=1)
 
@@ -58,7 +76,7 @@ class GalerkinTransformer2d(nn.Module):
 
         seq = self.lift(seq)
         for encoder in self.encoders:
-            seq = encoder(seq)
+            seq = encoder(seq, quadrature_weights)
         seq = self.project(seq)
 
         y = einops.rearrange(seq, "b (h w) c -> b c h w", h=height, w=width)

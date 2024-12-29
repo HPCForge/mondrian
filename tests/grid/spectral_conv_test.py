@@ -7,7 +7,7 @@ from mondrian.grid.spectral_conv import SimpleSpectralConv2d
 def get_func(d):
     x = torch.linspace(0, 1, d)
     y = torch.linspace(0, 1, d)
-    x, y = torch.meshgrid(x, y)
+    x, y = torch.meshgrid(x, y, indexing="xy")
     return torch.sin(2 * x + y * x).unsqueeze(0).unsqueeze(0).unsqueeze(0)
 
 

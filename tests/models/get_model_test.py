@@ -60,6 +60,7 @@ def test_galerkin_transformer():
     embed_dim: 32
     num_heads: 4
     num_layers: 4
+    quadrature_method: 'reimann'
   """
     )
     vit = get_model(3, 5, model_cfg)
