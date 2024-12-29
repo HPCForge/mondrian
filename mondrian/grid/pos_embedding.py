@@ -24,6 +24,9 @@ class FuncPosEmbedding2d(nn.Module):
         )
         # [seq_len x channels x height x width]
         cont_pos_embedding = F.interpolate(
-            disc_pos_embedding, (func_height, func_width), mode="bilinear"
+            disc_pos_embedding,
+            (func_height, func_width),
+            mode="bicubic",
+            align_corners=False,
         )
         return f + cont_pos_embedding.unsqueeze(0)

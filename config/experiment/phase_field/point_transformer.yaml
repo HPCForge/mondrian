@@ -1,0 +1,26 @@
+name: allen_cahn
+
+data_path: '/pub/afeeney/project/mondrian/datagen/fdm/allen_cahn_20000_32.hdf5'
+
+test_data_paths:
+  - '/pub/afeeney/project/mondrian/datagen/fdm/allen_cahn_1000_32.hdf5'
+  - '/pub/afeeney/project/mondrian/datagen/fdm/allen_cahn_1000_64.hdf5'
+  - '/pub/afeeney/project/mondrian/datagen/fdm/allen_cahn_1000_128.hdf5'
+
+train_workers: 0
+test_workers: 0
+
+train_cfg:
+  batch_size: 128
+  max_steps: 10000
+  pred_range: 72
+  lr: 0.001
+  weight_decay: 0.01
+  warmup_iters: 2000
+
+model_cfg:
+  name: 'point_transformer_2d'
+  embed_dim: 128
+  num_heads: 4
+  num_layers: 4
+  domain_size: [1, 1]

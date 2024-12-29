@@ -19,8 +19,13 @@ from lightning.pytorch.callbacks.progress.rich_progress import (
 from lightning.pytorch.loggers import WandbLogger
 
 from mondrian.models import get_model
-from mondrian.dataset.allen_cahn import AllenCahnInMemoryDataset
+from mondrian.dataset.toy_dataset import ToyInMemoryDataset
 from mondrian.trainer.simple_trainer import SimpleModule
+from mondrian.grid.quadrature import (
+    reimann_quadrature_weights,
+    trapezoid_quadrature_weights,
+    simpsons_13_quadrature_weights
+)
 
 
 @hydra.main(version_base=None, config_path="../../config", config_name="default")
@@ -32,11 +37,7 @@ def main(cfg):
     torch.cuda.manual_seed(cfg.seed)
 
     dtype = torch.float32
-    # use tensor cores, should use tf32 afaik
     torch.set_float32_matmul_precision("medium")
-    # Enable TF32 on matmul and cudnn.
-    # torch.backends.cuda.matmul.allow_tf32 = False
-    # orch.backends.cudnn.allow_tf32 = True
 
     # build experiment dataloaders
     train_loader, val_loader, in_channels, out_channels = get_dataloaders(cfg, dtype)
@@ -119,17 +120,12 @@ def get_dataloaders(cfg, dtype):
     test_workers = cfg.experiment.test_workers
 
     # get experiment dataset
-    dataset = AllenCahnInMemoryDataset(cfg.experiment.data_path)
-    train_size = int(len(dataset) * 0.7)
-    val_size = int(len(dataset) - train_size)
-    train_dataset, val_dataset = torch.utils.data.random_split(
-        dataset, [train_size, val_size]
-    )
-    in_channels = dataset.in_channels
-    out_channels = dataset.out_channels
+    train_dataset = ToyInMemoryDataset(cfg.experiment.train_path)
+    val_dataset = ToyInMemoryDataset(cfg.experiment.val_path)
 
-    # if cfg.experiment.name in exp:
-    # TODO: add val loader when bubbleml ready
+    in_channels = train_dataset.in_channels
+    out_channels = train_dataset.out_channels
+
     train_loader = DataLoader(
         train_dataset,
         batch_size=batch_size,

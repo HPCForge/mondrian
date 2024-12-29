@@ -34,10 +34,11 @@ def main(cfg):
             batch = dataset[i]
             input, label = batch
             pred = module(input.unsqueeze(0))
-            fig, axarr = plt.subplots(1, 3)
+            fig, axarr = plt.subplots(1, 3, figsize=(7, 2))
             axarr[0].imshow(input[0], cmap="plasma")
             axarr[1].imshow(pred.squeeze().detach(), cmap="plasma")
             axarr[2].imshow(label.squeeze(), cmap="plasma")
+            plt.tight_layout()
             plt.savefig(f"ac_{size}.png")
 
 

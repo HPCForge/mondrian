@@ -9,6 +9,10 @@ from scipy.ndimage import gaussian_filter
 import density_field_library as DFL
 
 
+# This is from pylians: https://pylians3.readthedocs.io/en/master/gaussian_fields.html
+import density_field_library as DFL
+
+
 def gaussian_field_2d(grid_res, box_size, k, Pk, seed):
     """Use Pylians to generate a Gaussian random field.
     Args:

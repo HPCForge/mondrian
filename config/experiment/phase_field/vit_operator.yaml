@@ -12,35 +12,19 @@ test_workers: 0
 
 train_cfg:
   batch_size: 128
-  max_steps: 100000
+  max_steps: 10000
   pred_range: 72
-  lr: 0.001
+  lr: 0.0001
   weight_decay: 0.01
-  warmup_iters: 1000
+  warmup_iters: 2000
 
 model_cfg:
   name: 'vit_operator_2d'
-  embed_dim: 32
-  num_heads: 4
+  embed_dim: 128
+  num_heads: 8
   head_split: 'channel'
-  score_method: 'trapezoid'
-  num_layers: 3
+  score_method: 'reimann'
+  num_layers: 4
   max_seq_len: 16
   subdomain_size: [1, 1]
   domain_size: [4, 4]
-
-#model_cfg:
-#  name: 'fno'
-#  n_modes: [16, 16]
-#  hidden_channels: 32
-#  num_layers: 5
-#  domain_size: null
-#  norm: 'instance_norm'
-#  domain_padding: .25
-
-#model_cfg:
-#  name: 'galerkin_transformer_2d'
-#  embed_dim: 128
-#  num_heads: 4
-#  num_layers: 4
-#  domain_size: [1, 1]

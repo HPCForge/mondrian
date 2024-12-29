@@ -25,19 +25,8 @@ class AllenCahnInMemoryDataset(nn.Module):
                     [grp[key].attrs["diffusivity"] for key in grp.keys()]
                 ).to(dtype)
 
-            # self.solution = self._normalize(solution)
-            # self.diffusivity = self._normalize(diffusivity)
-
-            print(self.solution.size())
-            print(self.diffusivity.size())
-
         self.in_channels = 2
         self.out_channels = 1
-
-    def _normalize(self, data):
-        mean = torch.mean(data)
-        var = torch.var(data)
-        return (data - mean) / var
 
     def __len__(self):
         return len(self.diffusivity)

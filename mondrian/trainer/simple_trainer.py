@@ -1,9 +1,3 @@
-r"""
-The RENOModule is intended for datasets
-from the ReNO and CNO papers. Basically,
-single input-output datasets
-"""
-
 import torch
 import torch.nn.functional as F
 
@@ -55,7 +49,8 @@ class SimpleModule(L.LightningModule):
     def training_step(self, batch, batch_idx):
         x, y = batch
         pred = self.forward(x)
-        loss = self.metrics.log(pred, y, "Train")
+        loss = F.mse_loss(pred, y)
+        # loss = self.metrics.log(pred, y, "Train")
         return loss
 
     def validation_step(self, batch, batch_idx):
