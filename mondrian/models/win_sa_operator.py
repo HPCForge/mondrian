@@ -49,7 +49,7 @@ class Encoder(nn.Module):
     v = self._spectral(self.norm2(v)) + v
     return v
 
-class WinSAOperator2d(nn.Module):
+class SwinSAOperator2d(nn.Module):
   r""" 
   A windowed self-attention operator for 2D data, modified from ViTSelfAttentionOperator by adding windowize self-attention.
   Removed n_sub_x, n_sub_y from parameter as self-attention is calculated in window level.

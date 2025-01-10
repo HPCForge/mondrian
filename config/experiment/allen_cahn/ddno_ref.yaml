@@ -6,8 +6,8 @@ use_point: False
 train_workers: 4
 test_workers: 4
 train_cfg:
-  batch_size: 4
-  max_epochs: 1000
+  batch_size: 2
+  max_epochs: 357
 
 model_cfg:
   model_name: ddno_ref
