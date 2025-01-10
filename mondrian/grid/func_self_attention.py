@@ -115,7 +115,7 @@ class FuncSelfAttention(nn.Module):
     if self.head_split == SPATIAL:
       return self._forward_function_heads(seq, n_sub_x, n_sub_y)
   
-class WinFuncSelfAttention(FuncSelfAttention):
+class SwinFuncSelfAttention(FuncSelfAttention):
   def __init__(self,
                 embed_dim: int,
                 num_heads: int,

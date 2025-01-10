@@ -5,7 +5,7 @@ from torch import nn
 
 from mondrian.grid.decompose import win_decompose2d, win_recompose2d
 from mondrian.grid.spectral_conv import SimpleSpectralConv2d
-from mondrian.grid.func_self_attention import WinFuncSelfAttention
+from mondrian.grid.func_self_attention import SwinFuncSelfAttention
 from mondrian.grid.pointwise import PointwiseMLP2d
 from mondrian.grid.seq_op import seq_op
 from mondrian.grid.pos_embedding import FuncPosEmbedding2d
@@ -30,7 +30,7 @@ class Encoder(nn.Module):
                window_size):
     super().__init__()
     self.shift_size = shift_size
-    self.sa = WinFuncSelfAttention(embed_dim, num_heads, use_bias, shift_size,  n_sub, window_size)
+    self.sa = SwinFuncSelfAttention(embed_dim, num_heads, use_bias, shift_size,  n_sub, window_size)
     modes = 8
     self.spectral_conv1 = SimpleSpectralConv2d(embed_dim, embed_dim, modes)
     self.spectral_conv2 = SimpleSpectralConv2d(embed_dim, embed_dim, modes)
