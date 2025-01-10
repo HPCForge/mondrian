@@ -25,9 +25,12 @@ class Encoder(nn.Module):
                embed_dim, 
                num_heads,
                use_bias,
+               shift_size,
+               n_sub,
                window_size):
     super().__init__()
-    self.sa = WinFuncSelfAttention(embed_dim, num_heads, use_bias, window_size)
+    self.shift_size = shift_size
+    self.sa = WinFuncSelfAttention(embed_dim, num_heads, use_bias, shift_size,  n_sub, window_size)
     modes = 8
     self.spectral_conv1 = SimpleSpectralConv2d(embed_dim, embed_dim, modes)
     self.spectral_conv2 = SimpleSpectralConv2d(embed_dim, embed_dim, modes)
@@ -36,7 +39,6 @@ class Encoder(nn.Module):
     self.norm2 = SequenceInstanceNorm2d(embed_dim)
   
   def _spectral(self, v):
-    v = nn.functional.gelu(self.spectral_conv1(v)) + v
     v = nn.functional.gelu(self.spectral_conv1(v)) + v
     v = self.norm2(self.spectral_conv2(v) + v)
     return v
@@ -69,6 +71,8 @@ class WinSAOperator2d(nn.Module):
                num_heads,
                num_layers,
                window_size,
+               shift_size,
+               n_sub,
                subdomain_size: Union[int, Tuple[int, int]]):
     super().__init__()
     self.in_channels = in_channels
@@ -79,13 +83,21 @@ class WinSAOperator2d(nn.Module):
     assert isinstance(subdomain_size[0], int) 
     assert isinstance(subdomain_size[1], int)
 
+    self.n_sub = n_sub
+    self.shift_size = shift_size
     self.window_size = window_size
     self.subdomain_size = subdomain_size
     self.sub_size_y = self.subdomain_size[0]
     self.sub_size_x = self.subdomain_size[1]
     
     self.embed = nn.ModuleList([
-      Encoder(embed_dim, num_heads, True, window_size) for _ in range(num_layers)
+      Encoder(embed_dim, 
+              num_heads, 
+              True, 
+              shift_size=0 if (i%2==0) else self.shift_size , 
+              n_sub=self.n_sub, 
+              window_size=self.window_size) 
+      for i in range(num_layers)
     ])
     
     self.input_project = PointwiseMLP2d(in_channels, embed_dim, hidden_channels=128)
@@ -116,13 +128,13 @@ class WinSAOperator2d(nn.Module):
     assert domain_size_x % self.sub_size_x == 0
     n_sub_y = domain_size_y // self.sub_size_y
     n_sub_x = domain_size_x // self.sub_size_x
-    
+
     v = self.input_project(v)
     d = win_decompose2d(v, n_sub_x, n_sub_y, self.window_size)
-    p = self.pos_embedding(d.size(1), d.size(-2), d.size(-1))
+    p = self.pos_embedding(d)
     d = d + p
     d = seq_op(self.padding.pad, d)
-        
+
     for embed in self.embed:
       d = embed(d)
       

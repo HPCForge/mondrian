@@ -15,5 +15,5 @@ from mondrian.grid.attention._naive import (
 def inner_product_score(u, v, p=2):
   return naive_inner_product_score(u, v, p)
 
-def attention(query, key, value, bias=None, score_method='reimann'):
-  return naive_self_attention(query, key, value, bias, score_method)
+def attention(query, key, value, bias=None, shifted=False, score_method='reimann'):
+  return naive_self_attention(query, key, value, bias, shifted, score_method)

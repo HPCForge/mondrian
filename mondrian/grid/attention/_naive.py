@@ -56,6 +56,7 @@ def self_attention(query,
                    key, 
                    value, 
                    bias: Optional[torch.Tensor] = None,
+                   shifted = False,
                    score_method='reimann'):
   assert score_method in SCORE_METHODS
   if score_method == 'reimann':
@@ -64,7 +65,14 @@ def self_attention(query,
     score = trapezoid_inner_product_score(query, key)
   score = score / math.sqrt(query.size(3))
   if bias is not None:
-    score = score + bias
+    if not shifted:
+      score = score + bias
+    else:
+      # batch*nWindows x nHeads x nSeq1 x nSeq2 -> batch x nWindows x nHeads x nSeq1 x nSeq2
+      batch_size = score.size(0)
+      num_windows = bias.size(0)
+      score = score.unflatten(0, (batch_size//num_windows, num_windows)) + bias
+      score = score.flatten(0, 1)
   probabilities = softmax(score, dim=-1)
   return einops.einsum(
     probabilities, value, 'b h s1 s2, b h s2 ... -> b h s1 ...')

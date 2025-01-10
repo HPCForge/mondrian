@@ -8,7 +8,7 @@ from torch import nn
 from .fast_math import attention
 from .spectral_conv import SimpleSpectralConv2d
 from .log_cpb import LogCPB
-from .decompose import decompose2d, recompose2d
+from .decompose import decompose2d, recompose2d, win_decompose2d, win_recompose2d
 from .utility import is_power_of_2
 
 CHANNEL = 'channel'
@@ -120,10 +120,81 @@ class WinFuncSelfAttention(FuncSelfAttention):
                 embed_dim: int,
                 num_heads: int,
                 use_bias: bool,
+                shift_size: int,
+                n_sub: int,
                 window_size: int):
-      super().__init__(embed_dim, num_heads, use_bias)
+      super().__init__(embed_dim, num_heads, 'channel', use_bias, 'reimann')
       self.window_size = window_size
-      
+      self.shift_size = shift_size
+      self.n_sub = n_sub
+
+      if self.shift_size > 0:
+        # calculate attention mask for SW-MSA
+        H, W = n_sub, n_sub
+        img_mask = torch.zeros((1, 1, H, W))
+        h_slices = (slice(0, -self.window_size),
+                    slice(-self.window_size, -self.shift_size),
+                    slice(-self.shift_size, None))
+        w_slices = (slice(0, -self.window_size),
+                    slice(-self.window_size, -self.shift_size),
+                    slice(-self.shift_size, None))
+        cnt = 0
+        for h in h_slices:
+            for w in w_slices:
+                img_mask[:,:, h, w] = cnt
+                cnt += 1
+
+        mask_windows = win_decompose2d(img_mask, H, W, self.window_size)
+        mask_windows = mask_windows.view(-1, self.window_size * self.window_size)
+        attn_mask = mask_windows.unsqueeze(1) - mask_windows.unsqueeze(2)
+        attn_mask = attn_mask.masked_fill(attn_mask != 0, float('-inf')).masked_fill(attn_mask == 0, float(0.0))
+        
+        dims = [1 for _ in range(attn_mask.dim()+1)]
+        dims[0] = self.num_heads
+        attn_mask = attn_mask.unsqueeze(0).repeat(dims)
+        # nW x nheads x win_size^2 x win_size^2
+        attn_mask = attn_mask.contiguous().permute(1,0,2,3)
+      else:
+        attn_mask = None
+
+      self.register_buffer("attn_mask", attn_mask)
+  
+  def _shifted_forward_channel_heads(self, seq, n_sub_x, n_sub_y):
+    r"""
+    Computes the multihead by partitioning along the channels axis
+    """
+    subdomain_size_x = seq.size(-1) // n_sub_x
+    subdomain_size_y = seq.size(-2) // n_sub_y
+
+    if self.shift_size > 0:
+      seq = win_recompose2d(seq, n_sub_x, n_sub_y, self.window_size)
+      seq = torch.roll(seq, shifts=(-self.shift_size * subdomain_size_x, -self.shift_size * subdomain_size_y), dims=(-2, -1))
+      seq = win_decompose2d(seq, n_sub_x, n_sub_y, self.window_size)
+
+    query, key, value = einops.rearrange(
+        self._qkv(seq),
+        'b s (qkv num_heads head_dim) ... -> qkv b num_heads s head_dim ...',
+        qkv=3,
+        num_heads=self.num_heads,
+        head_dim=self.head_dim)
+    
+    if self.attn_mask is None:
+      bias = self.log_cpb(n_sub_x, n_sub_y, device=query.device)
+    else:
+      bias = self.attn_mask + self.log_cpb(n_sub_x, n_sub_y, device=query.device) if self.log_cpb is not None else self.attn_mask
+
+    sa = attention(query, key, value, bias=bias, shifted=True, score_method=self.score_method)
+    sa = self._flatten(sa)
+    sa = self.output_operator(sa)
+    
+    
+    if self.shift_size > 0:
+      sa = win_recompose2d(sa, n_sub_x, n_sub_y, self.window_size)
+      sa = torch.roll(sa, shifts=(self.shift_size * subdomain_size_x, self.shift_size * subdomain_size_y), dims=(-2, -1))
+      sa = win_decompose2d(sa, n_sub_x, n_sub_y, self.window_size)
+
+    return  sa
+  
   def forward(self, seq):
-    return self._forward_channel_heads(seq, self.window_size, self.window_size)
+    return self._shifted_forward_channel_heads(seq, self.window_size, self.window_size)
 
