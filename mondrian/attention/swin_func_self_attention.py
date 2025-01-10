@@ -1,0 +1,105 @@
+from typing import Tuple
+import math
+
+import einops
+import torch
+from torch import nn
+from .functional.func_attention import func_attention
+from ..grid.decompose import win_decompose2d, win_recompose2d
+from .func_self_attention import FuncSelfAttention
+
+@torch.compile
+class SwinFuncSelfAttention(FuncSelfAttention):
+  def __init__(
+        self,
+        embed_dim: int,
+        num_heads: int,
+        head_split: str,
+        use_bias: bool,
+        shift_size: int,
+        n_sub: int,
+        window_size: int,
+        quadrature_method: str,
+    ):
+      super().__init__(embed_dim, num_heads, head_split, use_bias, quadrature_method)
+      self.window_size = window_size
+      self.shift_size = shift_size
+      self.n_sub = n_sub
+
+      if self.shift_size > 0:
+        # calculate attention mask for SW-MSA
+        H, W = n_sub, n_sub
+        img_mask = torch.zeros((1, 1, H, W))
+        h_slices = (slice(0, -self.window_size),
+                    slice(-self.window_size, -self.shift_size),
+                    slice(-self.shift_size, None))
+        w_slices = (slice(0, -self.window_size),
+                    slice(-self.window_size, -self.shift_size),
+                    slice(-self.shift_size, None))
+        cnt = 0
+        for h in h_slices:
+            for w in w_slices:
+                img_mask[:,:, h, w] = cnt
+                cnt += 1
+
+        mask_windows = win_decompose2d(img_mask, H, W, self.window_size)
+        mask_windows = mask_windows.view(-1, self.window_size * self.window_size)
+        attn_mask = mask_windows.unsqueeze(1) - mask_windows.unsqueeze(2)
+        attn_mask = attn_mask.masked_fill(attn_mask != 0, float('-inf')).masked_fill(attn_mask == 0, float(0.0))
+        
+        dims = [1 for _ in range(attn_mask.dim()+1)]
+        dims[0] = self.num_heads
+        attn_mask = attn_mask.unsqueeze(0).repeat(dims)
+        # nW x nheads x win_size^2 x win_size^2
+        attn_mask = attn_mask.contiguous().permute(1,0,2,3)
+      else:
+        attn_mask = None
+
+      self.register_buffer("attn_mask", attn_mask)
+  
+  def _shifted_forward_channel_heads(self, seq, n_sub_x, n_sub_y):
+    r"""
+    Computes the multihead by partitioning along the channels axis
+    """
+    subdomain_size_x = seq.size(-1) // n_sub_x
+    subdomain_size_y = seq.size(-2) // n_sub_y
+
+    if self.shift_size > 0:
+      seq = win_recompose2d(seq, n_sub_x, n_sub_y, self.window_size)
+      seq = torch.roll(seq, shifts=(-self.shift_size * subdomain_size_x, -self.shift_size * subdomain_size_y), dims=(-2, -1))
+      seq = win_decompose2d(seq, n_sub_x, n_sub_y, self.window_size)
+
+    query, key, value = einops.rearrange(
+        self._qkv(seq),
+        'b s (qkv num_heads head_dim) ... -> qkv b num_heads s head_dim ...',
+        qkv=3,
+        num_heads=self.num_heads,
+        head_dim=self.head_dim)
+    
+    if self.attn_mask is None:
+      bias = self.log_cpb(n_sub_x, n_sub_y, device=query.device)
+    else:
+      bias = self.attn_mask + self.log_cpb(n_sub_x, n_sub_y, device=query.device) if self.log_cpb is not None else self.attn_mask
+
+    quadrature_weights = self.quadrature(query)
+    sa = func_attention(
+        query,
+        key,
+        value,
+        quadrature_weights,
+        bias=bias,
+        shifted=True
+    )    
+    sa = einops.rearrange(sa, "b h s d ... -> b s (h d) ...")
+    sa = self.output_operator(sa)
+    
+    
+    if self.shift_size > 0:
+      sa = win_recompose2d(sa, n_sub_x, n_sub_y, self.window_size)
+      sa = torch.roll(sa, shifts=(self.shift_size * subdomain_size_x, self.shift_size * subdomain_size_y), dims=(-2, -1))
+      sa = win_decompose2d(sa, n_sub_x, n_sub_y, self.window_size)
+
+    return  sa
+  
+  def forward(self, seq):
+    return self._shifted_forward_channel_heads(seq, self.window_size, self.window_size)

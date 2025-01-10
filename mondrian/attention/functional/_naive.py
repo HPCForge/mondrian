@@ -32,11 +32,19 @@ def inner_product_score(query, key, quadrature_weights):
 
 
 def naive_func_attention(
-    query, key, value, quadrature_weights, bias=None, return_scores=False
+    query, key, value, quadrature_weights, bias=None, shifted=False, return_scores=False
 ):
     score = inner_product_score(query, key, quadrature_weights)
     if bias is not None:
-        score = score + bias
+        if not shifted:
+            score = score + bias
+        else:
+            # nWindows is flattened in the batch dimension
+            # batch*nWindows x nHeads x nSeq1 x nSeq2 -> batch x nWindows x nHeads x nSeq1 x nSeq2
+            batch_size = score.size(0)
+            num_windows = bias.size(0)
+            score = score.unflatten(0, (batch_size//num_windows, num_windows)) + bias
+            score = score.flatten(0, 1)
     probabilities = softmax(score, dim=-1)
     output = einops.einsum(probabilities, value, "b h s1 s2, b h s2 ... -> b h s1 ...")
     if return_scores:
