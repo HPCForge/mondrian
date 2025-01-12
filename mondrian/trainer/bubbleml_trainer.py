@@ -49,8 +49,7 @@ class BubbleMLModule(L.LightningModule):
     def training_step(self, batch, batch_idx):
         x, nuc, y = batch
         pred = self.forward(x, nuc)
-        loss = F.mse_loss(pred, y)
-        # loss = self.metrics.log(pred, y, "Train")
+        loss = self.metrics.log(pred, y, "Train")
         return loss
 
     def validation_step(self, batch, batch_idx):

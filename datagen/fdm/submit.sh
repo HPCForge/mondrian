@@ -5,8 +5,10 @@
 #SBATCH --cpus-per-task=40
 #SBATCH --time=02:00:00
 
-module load anaconda/2022.05
-source ~/env/neural-schwarz.sh
+source ~/.bashrc
+micromamba activate mondrian-fdm-data
 
-python allen_cahn.py
-#python kuramoto_sivashinsky.py
+python allen_cahn.py \
+        --sim_res 128 \
+        --down_res 32 \
+        --num_sims 20000

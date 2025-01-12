@@ -2,9 +2,11 @@ from typing import Union
 import torch
 import einops
 
+from ...grid.quadrature import get_unit_quadrature_weights
+
 
 @torch.compile
-def galerkin_attention(query, key, value, quadrature_weights=None):
+def galerkin_attention(query, key, value, quadrature_weights):
     r"""
     Implements the Galerkin-style attention operation:
       1. https://arxiv.org/pdf/2105.14995
@@ -22,9 +24,5 @@ def galerkin_attention(query, key, value, quadrature_weights=None):
     Returns:
       [..., s_q, e_v]
     """
-    if quadrature_weights is None:
-        quadrature_weights = 1 / query.size(-2)
-    else:
-        quadrature_weights = quadrature_weights.unsqueeze(-1)
-    weights = torch.matmul(key.transpose(-2, -1), value)
-    return torch.matmul(query * quadrature_weights, weights)
+    weights = torch.matmul(key.transpose(-2, -1) * quadrature_weights, value)
+    return torch.matmul(query, weights)

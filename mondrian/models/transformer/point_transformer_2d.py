@@ -4,7 +4,7 @@ import torch
 from torch import nn
 import einops
 
-from mondrian.grid.attention.vector_self_attention import (
+from mondrian.attention.vector_self_attention import (
     VectorSelfAttention,
 )
 from mondrian.grid.utility import cell_centered_grid
@@ -58,7 +58,7 @@ class PointTransformer2d(nn.Module):
 
         # concatenate point-wise positions
         g = cell_centered_grid(
-            (height, width), (domain_size_y, domain_size_x), device=x.device
+            (height, width), (domain_size_y, domain_size_x), zero_mean=True, device=x.device
         )
         g = einops.repeat(g, "... -> b ...", b=x.size(0))
         x = torch.cat((g, x), dim=1)

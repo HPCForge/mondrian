@@ -1,18 +1,20 @@
 from neuralop.models import FNO
-
-from .transformer.vit_operator_2d import ViTOperator2d
+from .factformer.factformer import FactorizedTransformer, FactFormer2D
+from .ffno.ffno import FNOFactorized2DBlock
+from .transformer.vit_operator_2d import ViTOperator2d, ViTOperatorFixedPosEmbedding2d
 from .transformer.galerkin_transformer_2d import GalerkinTransformer2d
 from .transformer.point_transformer_2d import PointTransformer2d
-from .ffno.ffno import FNOFactorized2DBlock
 
 _VIT_OPERATOR_2D = "vit_operator_2d"
+_VIT_OPERATOR_FIXED_POS_2D = 'vit_operator_fixed_pos_2d'
 _GALERKIN_TRANSFORMER_2D = "galerkin_transformer_2d"
 _POINT_TRANSFORMER_2D = "point_transformer_2d"
+_FACTFORMER_2D = 'factformer_2d'
 
 _FNO = "fno"
 _FFNO = "ffno"
 
-MODELS = [_VIT_OPERATOR_2D, _GALERKIN_TRANSFORMER_2D, _POINT_TRANSFORMER_2D, _FNO, _FFNO]
+MODELS = [_VIT_OPERATOR_2D, _VIT_OPERATOR_FIXED_POS_2D, _GALERKIN_TRANSFORMER_2D, _POINT_TRANSFORMER_2D, _FACTFORMER_2D, _FNO, _FFNO]
 
 
 def get_model(in_channels, out_channels, model_cfg):
@@ -24,7 +26,17 @@ def get_model(in_channels, out_channels, model_cfg):
             embed_dim=model_cfg.embed_dim,
             num_heads=model_cfg.num_heads,
             head_split=model_cfg.head_split,
-            score_method=model_cfg.score_method,
+            num_layers=model_cfg.num_layers,
+            max_seq_len=model_cfg.max_seq_len,
+            subdomain_size=model_cfg.subdomain_size,
+        )
+    if model_cfg.name == _VIT_OPERATOR_FIXED_POS_2D:
+        return ViTOperatorFixedPosEmbedding2d(
+            in_channels,
+            out_channels,
+            embed_dim=model_cfg.embed_dim,
+            num_heads=model_cfg.num_heads,
+            head_split=model_cfg.head_split,
             num_layers=model_cfg.num_layers,
             max_seq_len=model_cfg.max_seq_len,
             subdomain_size=model_cfg.subdomain_size,
@@ -36,7 +48,6 @@ def get_model(in_channels, out_channels, model_cfg):
             embed_dim=model_cfg.embed_dim,
             num_heads=model_cfg.num_heads,
             num_layers=model_cfg.num_layers,
-            quadrature_method=model_cfg.quadrature_method,
         )
     if model_cfg.name == _POINT_TRANSFORMER_2D:
         return PointTransformer2d(
@@ -45,6 +56,19 @@ def get_model(in_channels, out_channels, model_cfg):
             embed_dim=model_cfg.embed_dim,
             num_heads=model_cfg.num_heads,
             num_layers=model_cfg.num_layers,
+        )
+    if model_cfg.name == _FACTFORMER_2D:
+        return FactFormer2D(
+            in_dim=in_channels,
+            out_dim=out_channels,
+            dim=model_cfg.dim,
+            depth=model_cfg.depth,
+            dim_head=model_cfg.dim_head,
+            heads=model_cfg.heads,
+            pos_in_dim=2,
+            pos_out_dim=2,
+            kernel_multiplier=2,
+            positional_embedding='rotary'
         )
     if model_cfg.name == _FNO:
         return FNO(

@@ -6,8 +6,8 @@ import einops
 
 from mondrian.grid.decompose import decompose2d, recompose2d
 from mondrian.grid.attention.vector_self_attention import VectorSelfAttention
-from mondrian.grid.pointwise import PointwiseMLP2d
-from mondrian.grid.pos_embedding import FuncPosEmbedding2d
+from mondrian.layers.pointwise import PointwiseMLP2d
+from mondrian.layers.learned_pos_embedding import LearnedPosEmbedding2d
 from mondrian.grid.utility import grid
 
 from .mlp import MLP
@@ -78,7 +78,7 @@ class SwinOperator2d(nn.Module):
         self.output_project = PointwiseMLP2d(embed_dim, out_channels, hidden_channels=128)
 
         # TODO: Maybe make this optional...
-        self.pos_embedding = FuncPosEmbedding2d(
+        self.pos_embedding = LearnedPosEmbedding2d(
             max_seq_len=max_seq_len, channels=embed_dim
         )
 

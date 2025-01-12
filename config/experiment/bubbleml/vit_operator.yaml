@@ -7,20 +7,24 @@ test_data_path: '/pub/afeeney/Level-Set-Study/simulation/SubcooledBoiling/Test/t
 train_workers: 8
 test_workers: 8
 
+num_input_timesteps: 8
+input_step_size: 1
+lead_time: 20
+
 train_cfg:
-  batch_size: 128
-  max_steps: 10000
-  lr: 0.001
-  weight_decay: 0.01
+  batch_size: 32
+  max_epochs: 40
+  lr: 0.0003
+  weight_decay: 0.0001
   warmup_iters: 2000
 
 model_cfg:
   name: 'vit_operator_2d'
-  embed_dim: 128
-  num_heads: 8
+  embed_dim: 32
+  num_heads: 16
   head_split: 'channel'
   score_method: 'reimann'
-  num_layers: 4
+  num_layers: 5
   max_seq_len: 16
   subdomain_size: [1, 1]
-  domain_size: [4, 4]
+  domain_size: [16, 16]

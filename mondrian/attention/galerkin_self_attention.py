@@ -6,9 +6,7 @@ import torch
 from torch import nn
 
 from .functional.galerkin import galerkin_attention
-from ..utility import cell_centered_grid
-from ..quadrature import Quadrature2d
-
+from ..grid.utility import cell_centered_unit_grid
 
 @torch.compile
 class GalerkinSelfAttention(nn.Module):
@@ -29,7 +27,7 @@ class GalerkinSelfAttention(nn.Module):
         self._linear_init(self.wk.weight.data)
         self._linear_init(self.wv.weight.data)
 
-        # output operator
+        # output operator to combine the heads
         self.wo = nn.Linear(embed_dim, out_dim)
 
         if self.layer_norm:
@@ -50,7 +48,7 @@ class GalerkinSelfAttention(nn.Module):
             diagonal_view = torch.diagonal(data)
             diagonal_view += delta
 
-    def forward(self, seq, quadrature_weights=None):
+    def forward(self, seq, quadrature_weights):
         r"""
         Args:
           x: [batch, seq, embed]
@@ -67,17 +65,17 @@ class GalerkinSelfAttention(nn.Module):
             value = self.ln_value(value)
 
         ga_heads = galerkin_attention(
-            query, key, value, quadrature_weights=quadrature_weights
+            query, key, value, quadrature_weights
         )
         ga = einops.rearrange(ga_heads, "b heads s dim -> b s (heads dim)")
         ga = self.wo(ga)
         return ga
-
+    
 
 class GalerkinSubdomainSA(nn.Module):
     def __init__(self, embed_dim, out_dim, num_heads, method):
         super().__init__()
-        self.ga = GalerkinSelfAttention(embed_dim + 2, out_dim, num_heads, False)
+        self.ga = GalerkinSelfAttention(embed_dim + 2, out_dim, num_heads, True)
         self.quadrature = Quadrature2d(method)
 
     def forward(self, seq):
@@ -86,11 +84,10 @@ class GalerkinSubdomainSA(nn.Module):
         height = seq.size(-2)
         width = seq.size(-1)
 
-        # add point-wise positions, since always on subdomain can use (1, 1)
-        g = cell_centered_grid((height, width), (1, 1), seq.device)
+        # add point-wise positions, since always on subdomain can use [-1, 1]^2
+        g = 2 * cell_centered_unit_grid((height, width), seq.device) - 1
         g = einops.repeat(g, "... -> b s ...", b=seq.size(0), s=seq_len)
         seq = torch.cat((g, seq), dim=2)
-        # quadrature_weights = self.quadrature(seq)
 
         seq = einops.rearrange(seq, "b s c h w -> (b s) (h w) c")
         seq = self.ga(seq, None)

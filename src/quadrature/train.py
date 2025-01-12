@@ -21,7 +21,10 @@ from lightning.pytorch.loggers import WandbLogger
 from mondrian.models import get_model
 from mondrian.dataset.allen_cahn import AllenCahnInMemoryDataset
 from mondrian.trainer.simple_trainer import SimpleModule
-
+from mondrian.grid.quadrature import set_default_quadrature_method
+from mondrian.layers.qkv_operator import set_default_qkv_operator
+from mondrian.layers.feed_forward_operator import set_default_feed_forward_operator
+from mondrian.layers.spectral_conv import set_default_spectral_conv_modes
 
 @hydra.main(version_base=None, config_path="../../config", config_name="default")
 def main(cfg):
@@ -32,11 +35,14 @@ def main(cfg):
     torch.cuda.manual_seed(cfg.seed)
 
     dtype = torch.float32
-    # use tensor cores, should use tf32 afaik
-    torch.set_float32_matmul_precision("medium")
-    # Enable TF32 on matmul and cudnn.
-    # torch.backends.cuda.matmul.allow_tf32 = False
-    # orch.backends.cudnn.allow_tf32 = True
+    # Enable tf32 tensor cores
+    torch.set_float32_matmul_precision("high")
+    
+    # sets the default quadrature method for any integrals evaluated by the model
+    set_default_quadrature_method(cfg.experiment.quadrature_method)
+    set_default_qkv_operator(cfg.experiment.linear_operator)
+    set_default_feed_forward_operator(cfg.experiment.neural_operator)
+    set_default_spectral_conv_modes(cfg.experiment.spectral_conv_modes)
 
     # build experiment dataloaders
     train_loader, val_loader, in_channels, out_channels = get_dataloaders(cfg, dtype)
@@ -86,17 +92,15 @@ def main(cfg):
     ]
 
     # setup logger
+    logger_version = cfg.experiment.logger_version
     model_name = cfg.experiment.model_cfg.name
     lr = cfg.experiment.train_cfg.lr
-    if "score_method" in cfg.experiment.model_cfg:
-        quadrature = cfg.experiment.model_cfg.score_method
-    else:
-        quadrature = ""
+    quadrature = cfg.experiment.quadrature_method
     num_params = sum(p.numel() for p in model.parameters())
     logger_name = f"{model_name}_lr={lr}_params={num_params}_{quadrature}"
     logger = WandbLogger(
         name=logger_name,
-        version=str(time.time()),
+        version=f'{logger_version}_{model_name}_{quadrature}_lr-{lr}_params-{num_params}_{time.time()}',
         project="quadrature_allen_cahn",
         offline=cfg.wandb.offline,
     )
@@ -107,7 +111,7 @@ def main(cfg):
         logger=logger,
         callbacks=callbacks,
         max_steps=max_steps,
-        gradient_clip_val=0.1,
+        gradient_clip_val=0.5,
     )
     trainer.fit(module, train_loader, val_loader)
 
@@ -118,7 +122,6 @@ def get_dataloaders(cfg, dtype):
     train_workers = cfg.experiment.train_workers
     test_workers = cfg.experiment.test_workers
 
-    # get experiment dataset
     dataset = AllenCahnInMemoryDataset(cfg.experiment.data_path)
     train_size = int(len(dataset) * 0.7)
     val_size = int(len(dataset) - train_size)
@@ -128,8 +131,6 @@ def get_dataloaders(cfg, dtype):
     in_channels = dataset.in_channels
     out_channels = dataset.out_channels
 
-    # if cfg.experiment.name in exp:
-    # TODO: add val loader when bubbleml ready
     train_loader = DataLoader(
         train_dataset,
         batch_size=batch_size,

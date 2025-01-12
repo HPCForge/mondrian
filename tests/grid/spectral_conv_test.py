@@ -1,7 +1,7 @@
 import torch
 from torch.nn.functional import interpolate
 
-from mondrian.grid.spectral_conv import SimpleSpectralConv2d
+from mondrian.layers.spectral_conv import SimpleSpectralConv2d
 
 
 def get_func(d):
@@ -12,7 +12,7 @@ def get_func(d):
 
 
 def test_spectral():
-    operators = ["fno", "ffno", "random"]
+    operators = ["fno", "ffno"]
 
     # operators should be fairly robust to changing discretization
     for o in operators:

@@ -21,8 +21,9 @@ train_cfg:
   warmup_iters: 2000
 
 model_cfg:
-  name: 'point_transformer_2d'
-  embed_dim: 128
-  num_heads: 4
-  num_layers: 4
+  name: 'factformer_2d'
+  depth: 4
+  dim: 256
+  dim_head: 64
+  heads: 4
   domain_size: [1, 1]
