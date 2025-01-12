@@ -17,18 +17,19 @@ class SwinFuncSelfAttention(FuncSelfAttention):
         head_split: str,
         use_bias: bool,
         shift_size: int,
-        n_sub: int,
+        n_sub_x: int,
+        n_sub_y: int,
         window_size: int,
-        quadrature_method: str,
     ):
-      super().__init__(embed_dim, num_heads, head_split, use_bias, quadrature_method)
+      super().__init__(embed_dim, num_heads, head_split, use_bias)
       self.window_size = window_size
       self.shift_size = shift_size
-      self.n_sub = n_sub
+      self.n_sub_x = n_sub_x
+      self.n_sub_y = n_sub_y
 
       if self.shift_size > 0:
         # calculate attention mask for SW-MSA
-        H, W = n_sub, n_sub
+        H, W = self.n_sub_y, self.n_sub_x
         img_mask = torch.zeros((1, 1, H, W))
         h_slices = (slice(0, -self.window_size),
                     slice(-self.window_size, -self.shift_size),
@@ -44,9 +45,10 @@ class SwinFuncSelfAttention(FuncSelfAttention):
 
         mask_windows = win_decompose2d(img_mask, H, W, self.window_size)
         mask_windows = mask_windows.view(-1, self.window_size * self.window_size)
+        
         attn_mask = mask_windows.unsqueeze(1) - mask_windows.unsqueeze(2)
         attn_mask = attn_mask.masked_fill(attn_mask != 0, float('-inf')).masked_fill(attn_mask == 0, float(0.0))
-        
+
         dims = [1 for _ in range(attn_mask.dim()+1)]
         dims[0] = self.num_heads
         attn_mask = attn_mask.unsqueeze(0).repeat(dims)
@@ -54,7 +56,7 @@ class SwinFuncSelfAttention(FuncSelfAttention):
         attn_mask = attn_mask.contiguous().permute(1,0,2,3)
       else:
         attn_mask = None
-
+        
       self.register_buffer("attn_mask", attn_mask)
   
   def _shifted_forward_channel_heads(self, seq, n_sub_x, n_sub_y):
@@ -63,7 +65,7 @@ class SwinFuncSelfAttention(FuncSelfAttention):
     """
     subdomain_size_x = seq.size(-1) // n_sub_x
     subdomain_size_y = seq.size(-2) // n_sub_y
-
+  
     if self.shift_size > 0:
       seq = win_recompose2d(seq, n_sub_x, n_sub_y, self.window_size)
       seq = torch.roll(seq, shifts=(-self.shift_size * subdomain_size_x, -self.shift_size * subdomain_size_y), dims=(-2, -1))
@@ -79,20 +81,22 @@ class SwinFuncSelfAttention(FuncSelfAttention):
     if self.attn_mask is None:
       bias = self.log_cpb(n_sub_x, n_sub_y, device=query.device)
     else:
+      # NOTE: the attn_mask can be different in different windows. So, the bias is computed for each window. 
+      # When attention is called, the batch and window dimensions are merged, so we need to repeat the bias to account for this.
       bias = self.attn_mask + self.log_cpb(n_sub_x, n_sub_y, device=query.device) if self.log_cpb is not None else self.attn_mask
-
-    quadrature_weights = self.quadrature(query)
+      # query already has batch and window merged, so this is safe.
+      n_window = query.size(0) // self.attn_mask.size(0)
+      ones = [1 for _ in range(bias.dim() - 1)]
+      bias = bias.repeat(n_window, *ones)
+      
     sa = func_attention(
         query,
         key,
         value,
-        quadrature_weights,
-        bias=bias,
-        shifted=True
+        attn_mask=bias
     )    
     sa = einops.rearrange(sa, "b h s d ... -> b s (h d) ...")
     sa = self.output_operator(sa)
-    
     
     if self.shift_size > 0:
       sa = win_recompose2d(sa, n_sub_x, n_sub_y, self.window_size)

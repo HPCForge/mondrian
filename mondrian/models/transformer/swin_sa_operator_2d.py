@@ -9,7 +9,7 @@ from mondrian.grid.spectral_conv import SimpleSpectralConv2d
 from mondrian.attention.swin_func_self_attention import SwinFuncSelfAttention
 from mondrian.grid.pointwise import PointwiseMLP2d
 from mondrian.grid.seq_op import seq_op
-from mondrian.grid.utility import cell_centered_grid
+from mondrian.grid.utility import cell_centered_unit_grid
 
 class SequenceInstanceNorm2d(nn.Module):
   def __init__(self, embed_dim):
@@ -20,11 +20,11 @@ class SequenceInstanceNorm2d(nn.Module):
     return seq_op(self.norm, v)
   
 class Encoder(nn.Module):
-  def __init__(self, embed_dim, num_heads, head_split, score_method, use_bias, shift_size, n_sub, window_size):
+  def __init__(self, embed_dim, num_heads, head_split, use_bias, shift_size, n_sub_x, n_sub_y, window_size):
     super().__init__()
     self.shift_size = shift_size
     self.sa = SwinFuncSelfAttention(
-      embed_dim, num_heads, head_split, use_bias, shift_size, n_sub, window_size, score_method
+      embed_dim, num_heads, head_split, use_bias, shift_size, n_sub_x, n_sub_y, window_size
     )
     self.mlp = PointwiseMLP2d(embed_dim, embed_dim, embed_dim)
     self.norm1 = SequenceInstanceNorm2d(embed_dim)
@@ -46,9 +46,9 @@ class SwinSAOperator2d(nn.Module):
     num_heads: The number of heads used in multihead attention.
     head_split: way to split heads for multihead attention. ['spatial', 'channel'] 
     num_layers: The number of Encoder blocks.
-    window_size: The number of the subdomain in each coordinate of the window (assuming square window).
-    shift_size: The number of the subdomain to shift in each coordinate of the window.
-    n_sub: The number of subdomains in each coordinate of the global domain.
+    window_size: The number of subdomains in each window (assuming square window).
+    shift_size: The number of subdomains to shift.
+    n_sub: The number of subdomains the global domain.
     sub_domain_size: The physical subdomain size. This is independent of
                     the input discretization. It should correspond to some
                     "physical" dimension, relative to the global domain size.
@@ -59,11 +59,11 @@ class SwinSAOperator2d(nn.Module):
                embed_dim: int,
                num_heads: int,
                head_split: str,
-               score_method: str,
                num_layers: int,
                window_size: int,
                shift_size: int,
-               n_sub: int,
+               n_sub_x: int,
+               n_sub_y: int,
                subdomain_size: Union[int, Tuple[int, int]]):
     super().__init__()
     self.in_channels = in_channels
@@ -74,7 +74,8 @@ class SwinSAOperator2d(nn.Module):
     assert isinstance(subdomain_size[0], int) 
     assert isinstance(subdomain_size[1], int)
 
-    self.n_sub = n_sub
+    self.n_sub_x = n_sub_x
+    self.n_sub_y = n_sub_y
     self.shift_size = shift_size
     self.window_size = window_size
     self.subdomain_size = subdomain_size
@@ -85,10 +86,10 @@ class SwinSAOperator2d(nn.Module):
       Encoder(embed_dim, 
               num_heads, 
               head_split,
-              score_method,
               True, 
               shift_size=0 if (i%2==0) else self.shift_size , 
-              n_sub=self.n_sub, 
+              n_sub_x=self.n_sub_x,
+              n_sub_y=self.n_sub_y, 
               window_size=self.window_size) 
       for i in range(num_layers)
     ])
@@ -120,9 +121,9 @@ class SwinSAOperator2d(nn.Module):
     # concatenate point-wise positions
     height = v.size(-2)
     width = v.size(-1)
-    g = cell_centered_grid(
-        (height, width), (domain_size_y, domain_size_x), device=v.device
-    )
+    g = 2 * cell_centered_unit_grid(
+        (height, width), device=v.device
+    ) - 1
     g = einops.repeat(g, "... -> b ...", b=v.size(0))
     v = torch.cat((g, v), dim=1)
 
