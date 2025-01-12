@@ -1,8 +1,8 @@
 import torch
 import einops
 
-from mondrian.grid.attention.func_self_attention import FuncSelfAttention
-from mondrian.grid.attention.functional._naive import naive_func_attention
+from mondrian.attention.func_self_attention import FuncSelfAttention
+from mondrian.attention.functional._naive import naive_func_attention
 from mondrian.grid.quadrature import Quadrature2d
 
 
@@ -11,7 +11,6 @@ def test_vit_sa_init():
         embed_dim=32,
         num_heads=4,
         head_split="channel",
-        quadrature_method="reimann",
         use_bias=False,
     )
     assert vit.embed_dim == 32
@@ -23,7 +22,6 @@ def test_vit_sa_init():
         num_heads=4,
         use_bias=True,
         head_split="channel",
-        quadrature_method="reimann",
     )
     assert vit.embed_dim == 32
     assert vit.num_heads == 4
@@ -32,7 +30,7 @@ def test_vit_sa_init():
 
 def test_vit_sa_forward_no_bias():
     vit = FuncSelfAttention(
-        32, 4, use_bias=False, head_split="channel", quadrature_method="reimann"
+        32, 4, use_bias=False, head_split="channel"
     )
     v = torch.ones(8, 4, 32, 16, 16)
     u = vit(v, 2, 2)
@@ -46,7 +44,7 @@ def test_vit_sa_forward_no_bias():
 
 def test_vit_sa_forward_with_bias():
     vit = FuncSelfAttention(
-        32, 4, use_bias=True, head_split="channel", quadrature_method="reimann"
+        32, 4, use_bias=True, head_split="channel"
     )
     v = torch.ones(8, 4, 32, 16, 16)
     u = vit(v, 2, 2)

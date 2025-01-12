@@ -1,10 +1,10 @@
 import torch
 import pytest
 
-from mondrian.grid.attention.triton.galerkin import (
+from mondrian.attention.triton.galerkin import (
     galerkin_attention as galerkin_attention_triton,
 )
-from mondrian.grid.attention.functional.galerkin import galerkin_attention
+from mondrian.attention.functional.galerkin import galerkin_attention
 
 
 # helpful if a test only makes sense for GPU

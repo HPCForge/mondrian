@@ -1,16 +1,39 @@
+import math
+import logging
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from einops import einsum
+
 from neuralop.layers.spectral_convolution import SpectralConv
 
-from mondrian.grid.seq_op import seq_op
+from mondrian.layers.seq_op import seq_op
 
 VERSIONS = ["fno", "ffno", "cnn", "random"]
 
+_DEFAULT_SPECTRAL_CONV_MODES = None
+
+def set_default_spectral_conv_modes(modes: int):
+    global _DEFAULT_SPECTRAL_CONV_MODES
+    logging.info(f'changing _DEFAULT_SPECTRAL_CONV_MODES to {modes}')
+    _DEFAULT_SPECTRAL_CONV_MODES = modes
+
+class SpectralConvNeuralOperator(nn.Sequential):
+    def __init__(self, in_channels, out_channels, hidden_channels, version="fno", modes=_DEFAULT_SPECTRAL_CONV_MODES):
+        super().__init__(
+            SimpleSpectralConv2d(in_channels, hidden_channels, modes, version=version),
+            nn.GELU(),
+            SimpleSpectralConv2d(hidden_channels, out_channels, modes, version=version)
+        )
 
 class SimpleSpectralConv2d(nn.Module):
-    def __init__(self, in_channels, out_channels, n_modes: int, version: str = "fno"):
+    def __init__(self, 
+                 in_channels, 
+                 out_channels, 
+                 n_modes: int = _DEFAULT_SPECTRAL_CONV_MODES, 
+                 bias: bool = True, 
+                 version: str = "fno"):
         super().__init__()
         assert isinstance(n_modes, int)
         assert version in VERSIONS
@@ -29,7 +52,17 @@ class SimpleSpectralConv2d(nn.Module):
             self.spectral = RandomProjectionConv2d(
                 in_channels, out_channels, inner_dim=32
             )
+            
+        if bias:
+            self.bias = nn.Parameter(torch.empty(out_channels, 1, 1))
+            stdv = 1 / math.sqrt(self.in_channels)
+            with torch.no_grad():
+                self.bias.uniform_(-stdv, stdv)
+        else:
+            self.bias = None
 
+    # compile doesn't like complex-valued stuff.
+    @torch.compiler.disable
     def forward(self, x):
         r"""
         Args:
@@ -38,8 +71,10 @@ class SimpleSpectralConv2d(nn.Module):
             out: [batch x seq x out_channels x H x W]
         """
         assert x.dim() == 5
-        return seq_op(self.spectral, x)
-
+        x = seq_op(self.spectral, x)
+        if self.bias is not None:
+            x = x + self.bias
+        return x
 
 class FactorizedSpectralConv2d(nn.Module):
     r"""
@@ -71,42 +106,32 @@ class FactorizedSpectralConv2d(nn.Module):
     def forward(self, x):
         B, I, M, N = x.shape
 
-        # # # Dimesion Y # # #
+        # apply spectral conv along y-dimension
+        # [batch_size, in_dim, grid_size, grid_size // 2 + 1]
         x_fty = torch.fft.rfft(x, dim=-1, norm="ortho")
-        # x_ft.shape == [batch_size, in_dim, grid_size, grid_size // 2 + 1]
-
+        # [batch_size, out_dim, grid_size, grid_size // 2 + 1, 2]
         out_ft = x_fty.new_zeros(B, self.out_dim, M, N // 2 + 1)
-        # out_ft.shape == [batch_size, in_dim, grid_size, grid_size // 2 + 1, 2]
-
         out_ft[:, :, :, : self.n_modes] = einsum(
             x_fty[:, :, :, : self.n_modes],
             torch.view_as_complex(self.fourier_weight[0]),
             "b i x y, i o y -> b o x y",
         )
-
+        # [batch_size, in_dim, grid_size, grid_size]
         xy = torch.fft.irfft(out_ft, n=N, dim=-1, norm="ortho")
-        # x.shape == [batch_size, in_dim, grid_size, grid_size]
 
-        # # # Dimesion X # # #
-        x_ftx = torch.fft.rfft(x, dim=-2, norm="ortho")
-        # x_ft.shape == [batch_size, in_dim, grid_size // 2 + 1, grid_size]
-
+        # apply spectral conv along x-dimension
+        # [batch_size, in_dim, grid_size // 2 + 1, grid_size]
+        x_ftx = torch.fft.rfft(x, dim=-2, norm="ortho")        
+        # [batch_size, out_dim, grid_size // 2 + 1, grid_size, 2]
         out_ft = x_ftx.new_zeros(B, self.out_dim, M // 2 + 1, N)
-        # out_ft.shape == [batch_size, in_dim, grid_size // 2 + 1, grid_size, 2]
-
         out_ft[:, :, : self.n_modes, :] = einsum(
             x_ftx[:, :, : self.n_modes, :],
             torch.view_as_complex(self.fourier_weight[1]),
             "b i x y, i o x -> b o x y",
         )
-
         xx = torch.fft.irfft(out_ft, n=M, dim=-2, norm="ortho")
-        # x.shape == [batch_size, in_dim, grid_size, grid_size]
-
-        # # Combining Dimensions # #
-        x = xx + xy
-
-        return x
+        
+        return xx + xy
 
 
 class RandomProjectionConv2d(nn.Module):
@@ -129,7 +154,7 @@ class RandomProjectionConv2d(nn.Module):
         self.in_dim = in_dim
         self.out_dim = out_dim
         self.inner_dim = inner_dim
-        self.order = 16
+        self.order = 8
 
         kernel_size = 1
         padding = (kernel_size - 1) // 2
@@ -152,28 +177,28 @@ class RandomProjectionConv2d(nn.Module):
         return F.interpolate(
             self.down_x_func.unsqueeze(0).unsqueeze(0),
             size=(res, self.inner_dim),
-            mode="bicubic",
+            mode="bilinear",
         ).squeeze()
 
     def _get_down_y(self, res):
         return F.interpolate(
             self.down_y_func.unsqueeze(0).unsqueeze(0),
             size=(res, self.inner_dim),
-            mode="bicubic",
+            mode="bilinear",
         ).squeeze()
 
     def _get_up_x(self, res):
         return F.interpolate(
             self.up_x_func.unsqueeze(0).unsqueeze(0),
             size=(res, self.inner_dim),
-            mode="bicubic",
+            mode="bilinear",
         ).squeeze()
 
     def _get_up_y(self, res):
         return F.interpolate(
             self.up_y_func.unsqueeze(0).unsqueeze(0),
             size=(res, self.inner_dim),
-            mode="bicubic",
+            mode="bilinear",
         ).squeeze()
 
     def forward(self, x):
@@ -184,15 +209,15 @@ class RandomProjectionConv2d(nn.Module):
         dpx = self._get_down_x(res_x)
         dpy = self._get_down_y(res_y)
 
-        down_x = einsum(x, dpx / res_x, "b c y x, x i -> b c y i")
-        down_yx = einsum(down_x, dpy / res_y, "b c y i, y j -> b c j i")
+        down_x = einsum(x, dpx, "b c y x, x i -> b c y i")  / res_x
+        down_yx = einsum(down_x, dpy, "b c y i, y j -> b c j i") / res_y
 
         scale_yx = self.c_x(down_yx)
 
         upx = self._get_up_x(res_x)
         upy = self._get_up_y(res_y)
 
-        new_x = einsum(scale_yx, upx / res_x, "b oc j i, x i -> b oc j x")
-        new_yx = einsum(new_x, upy / res_y, "b oc j x, y j -> b oc y x")
+        new_x = einsum(scale_yx, upx, "b oc j i, x i -> b oc j x")# / res_x
+        new_yx = einsum(new_x, upy, "b oc j x, y j -> b oc y x")# / res_y
 
         return new_yx

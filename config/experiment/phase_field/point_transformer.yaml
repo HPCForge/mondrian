@@ -10,9 +10,11 @@ test_data_paths:
 train_workers: 0
 test_workers: 0
 
+quadrature_method: 'reimann'
+
 train_cfg:
   batch_size: 128
-  max_steps: 10000
+  max_steps: 30000
   pred_range: 72
   lr: 0.001
   weight_decay: 0.01

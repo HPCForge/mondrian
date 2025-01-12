@@ -1,18 +1,24 @@
 name: allen_cahn
 
-data_path: '/pub/afeeney/project/mondrian/datagen/fdm/allen_cahn_20000_32.hdf5'
+data_path: '/pub/afeeney/project/mondrian/datagen/fdm/fix_allen_cahn_20000_32.hdf5'
 
 test_data_paths:
-  - '/pub/afeeney/project/mondrian/datagen/fdm/allen_cahn_1000_32.hdf5'
-  - '/pub/afeeney/project/mondrian/datagen/fdm/allen_cahn_1000_64.hdf5'
-  - '/pub/afeeney/project/mondrian/datagen/fdm/allen_cahn_1000_128.hdf5'
+  - '/pub/afeeney/project/mondrian/datagen/fdm/fix_allen_cahn_2000_32.hdf5'
+  - '/pub/afeeney/project/mondrian/datagen/fdm/fix_allen_cahn_2000_64.hdf5'
+  - '/pub/afeeney/project/mondrian/datagen/fdm/fix_allen_cahn_2000_128.hdf5'
+
+logger_version: 'fno'
 
 train_workers: 0
 test_workers: 0
 
+quadrature_method: 'reimann'
+linear_operator: null
+neural_operator: null
+
 train_cfg:
   batch_size: 128
-  max_steps: 20000
+  max_steps: 30000
   pred_range: 72
   lr: 0.001
   weight_decay: 0.01
@@ -20,9 +26,9 @@ train_cfg:
 
 model_cfg:
   name: 'fno'
-  n_modes: [16, 16]
+  n_modes: [24, 24]
   hidden_channels: 32
-  num_layers: 5
+  num_layers: 4
   domain_size: null
-  norm: 'instance_norm'
+  norm: 'group_norm'
   domain_padding: .25
