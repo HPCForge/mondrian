@@ -36,8 +36,7 @@ def main(cfg):
     torch.cuda.manual_seed(cfg.seed)
 
     dtype = torch.float32
-    # use tensor cores, should use tf32 afaik
-    torch.set_float32_matmul_precision("medium")
+    torch.set_float32_matmul_precision("high")
     # Enable TF32 on matmul and cudnn.
     # torch.backends.cuda.matmul.allow_tf32 = False
     # orch.backends.cudnn.allow_tf32 = True
@@ -101,7 +100,7 @@ def main(cfg):
     logger_name = f"{model_name}_lr={lr}_params={num_params}_{quadrature}"
     logger = WandbLogger(
         name=logger_name,
-        version=str(time.time()),
+        version=f'{model_name}_{num_params}_{time.time()}',
         project="bubbleml",
         offline=cfg.wandb.offline,
     )
@@ -112,7 +111,7 @@ def main(cfg):
         logger=logger,
         callbacks=callbacks,
         max_steps=max_steps,
-        gradient_clip_val=0.1,
+        gradient_clip_val=1.0,
     )
     trainer.fit(module, train_loader, val_loader)
 

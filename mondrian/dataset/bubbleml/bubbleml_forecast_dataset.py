@@ -7,9 +7,7 @@ import torch
 from torch import nn
 
 from .constants import (
-    BULK_TEMP,
     normalize_dfun,
-    normalize_mass_flux,
     normalize_temperature,
     normalize_velx,
     normalize_vely,
@@ -41,7 +39,7 @@ class BubbleMLForecastDataset(torch.utils.data.Dataset):
         self.lead_time = lead_time
 
         self.in_channels = 5 * self.num_input_timesteps
-        self.out_channels = 4
+        self.out_channels = 8
 
         # TODO: it's actually like 780 or something
         timesteps = 700

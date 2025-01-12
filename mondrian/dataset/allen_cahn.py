@@ -15,7 +15,6 @@ class AllenCahnInMemoryDataset(nn.Module):
     def __init__(self, path, dtype=torch.float32):
         super().__init__()
         with h5py.File(path, "r") as handle:
-            print(handle.keys())
             for res_group in handle.keys():
                 grp = handle[res_group]
                 self.solution = torch.stack(
