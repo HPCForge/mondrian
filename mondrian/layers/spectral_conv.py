@@ -37,6 +37,7 @@ class SimpleSpectralConv2d(nn.Module):
         super().__init__()
         assert isinstance(n_modes, int)
         assert version in VERSIONS
+        self.in_channels = in_channels
         if version == "fno":
             n_modes = (n_modes, n_modes)
             self.spectral = SpectralConv(in_channels, out_channels, n_modes)

@@ -6,7 +6,6 @@ from torch import nn
 
 from ..grid.utility import cell_centered_unit_grid
 from ..grid.quadrature import get_unit_quadrature_weights
-import matplotlib.pyplot as plt
 
 class NeuralOperator(nn.Sequential):
     def __init__(self, in_channels, out_channels, hidden_channels):
@@ -58,7 +57,7 @@ class LinearOperator2d(LinearOperator2dBase):
     def forward(self, v):
         height = v.size(-2)
         width = v.size(-1)
-        coords = unit_grid((height, width, height, width), device=v.device).permute(1, 2, 3, 4, 0)
+        coords = cell_centered_unit_grid((height, width, height, width), device=v.device).permute(1, 2, 3, 4, 0)
         kernel = self.kernel(coords).reshape(height, width, height, width, self.out_channels, self.in_channels)
         quadrature_weights = get_unit_quadrature_weights((height, width), device=v.device)
         v = einops.einsum(kernel, quadrature_weights * v, 'h1 w1 h2 w2 o i, ... i h1 w2 -> ... o h2 w2')
@@ -79,8 +78,7 @@ class SeparableLinearOperator2d(LinearOperator2dBase):
     def forward(self, v):
         height = v.size(-2)
         width = v.size(-1)
-        coords = unit_grid((height, width, height, width), device=v.device).permute(1, 2, 3, 4, 0)
-        #coords = cell_centered_unit_grid((height, width, height, width), device=v.device).permute(1, 2, 3, 4, 0)
+        coords = cell_centered_unit_grid((height, width, height, width), device=v.device).permute(1, 2, 3, 4, 0)
         kernel = self.kernel(coords).reshape(height, width, height, width, self.in_channels)
         quadrature_weights = get_unit_quadrature_weights((height, width), device=v.device)
         v = einops.einsum(kernel, quadrature_weights * v, 'h1 w1 h2 w2 i, ... i h1 w2 -> ... i h2 w2')
