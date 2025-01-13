@@ -63,8 +63,8 @@ class SwinFuncSelfAttention(FuncSelfAttention):
     r"""
     Computes the multihead by partitioning along the channels axis
     """
-    subdomain_size_x = seq.size(-1) // n_sub_x
-    subdomain_size_y = seq.size(-2) // n_sub_y
+    subdomain_size_x = seq.size(-1)
+    subdomain_size_y = seq.size(-2)
   
     if self.shift_size > 0:
       seq = win_recompose2d(seq, n_sub_x, n_sub_y, self.window_size)
@@ -79,11 +79,11 @@ class SwinFuncSelfAttention(FuncSelfAttention):
         head_dim=self.head_dim)
     
     if self.attn_mask is None:
-      bias = self.log_cpb(n_sub_x, n_sub_y, device=query.device)
+      bias = self.log_cpb(self.window_size, self.window_size, device=query.device)
     else:
       # NOTE: the attn_mask can be different in different windows. So, the bias is computed for each window. 
       # When attention is called, the batch and window dimensions are merged, so we need to repeat the bias to account for this.
-      bias = self.attn_mask + self.log_cpb(n_sub_x, n_sub_y, device=query.device) if self.log_cpb is not None else self.attn_mask
+      bias = self.attn_mask + self.log_cpb(self.window_size, self.window_size, device=query.device) if self.log_cpb is not None else self.attn_mask
       # query already has batch and window merged, so this is safe.
       n_window = query.size(0) // self.attn_mask.size(0)
       ones = [1 for _ in range(bias.dim() - 1)]
@@ -105,5 +105,5 @@ class SwinFuncSelfAttention(FuncSelfAttention):
 
     return  sa
   
-  def forward(self, seq):
-    return self._shifted_forward_channel_heads(seq, self.window_size, self.window_size)
+  def forward(self, seq, n_sub_x, n_sub_y):
+    return self._shifted_forward_channel_heads(seq, n_sub_x, n_sub_y)
