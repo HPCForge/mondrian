@@ -30,8 +30,8 @@ class Encoder(nn.Module):
     self.norm1 = SequenceInstanceNorm2d(embed_dim)
     self.norm2 = SequenceInstanceNorm2d(embed_dim)
   
-  def forward(self, v):
-        v = self.sa(self.norm1(v)) + v
+  def forward(self, v, n_sub_x, n_sub_y):
+        v = self.sa(self.norm1(v), n_sub_x, n_sub_y) + v
         v = seq_op(self.mlp, self.norm2(v)) + v
         return v
 
