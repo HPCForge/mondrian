@@ -132,7 +132,7 @@ class SwinSAOperator2d(nn.Module):
     d = win_decompose2d(v, n_sub_x, n_sub_y, self.window_size)
 
     for encoder in self.encoder:
-      d = encoder(d)
+      d = encoder(d, domain_size_x, domain_size_y)
       
     u = win_recompose2d(d, n_sub_x, n_sub_y, self.window_size)
     u = self.output_project(u)
