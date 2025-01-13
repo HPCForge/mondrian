@@ -76,7 +76,6 @@ class GalerkinSubdomainSA(nn.Module):
     def __init__(self, embed_dim, out_dim, num_heads, method):
         super().__init__()
         self.ga = GalerkinSelfAttention(embed_dim + 2, out_dim, num_heads, True)
-        self.quadrature = Quadrature2d(method)
 
     def forward(self, seq):
         batch = seq.size(0)
