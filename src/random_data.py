@@ -27,6 +27,13 @@ def integrate(x):
     qw = simpsons_13_quadrature_weights((1, 1), (x.size(-2), x.size(-1)), device=x.device)
     return (x * qw).sum()
 
+def sin_data(d):
+    delta = 1 / d
+    x = delta * (torch.arange(0, d) + 0.5)
+    x = 1.5 * x #- 1.5
+    x, y = torch.meshgrid(x, x, indexing='xy')
+    return torch.exp(1.2 * x * y).unsqueeze(0).unsqueeze(0)
+
 def test(model, data_func, default_quad):
     r"""
     This basically checks how quickly a model spits out a
@@ -40,6 +47,7 @@ def test(model, data_func, default_quad):
     print(f'  - target: {target.mean()}')
     for res in [3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 51, 71, 91, 129]:
         data = data_func(res).cuda()
+        print(data.min(), data.max())
         out = model(data)
         print(f' - {res} estimate: {integrate(out)}, {integrate(target)} error: {abs(integrate(target) - integrate(out))}')
 

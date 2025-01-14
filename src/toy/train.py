@@ -89,8 +89,8 @@ def main(cfg):
     # setup logger
     model_name = cfg.experiment.model_cfg.name
     lr = cfg.experiment.train_cfg.lr
-    if "score_method" in cfg.experiment.model_cfg:
-        quadrature = cfg.experiment.model_cfg.score_method
+    if "quadrature_method" in cfg.experiment:
+        quadrature = cfg.experiment.quadrature_method
     else:
         quadrature = ""
     num_params = sum(p.numel() for p in model.parameters())
@@ -98,7 +98,7 @@ def main(cfg):
     logger = WandbLogger(
         name=logger_name,
         version=str(time.time()),
-        project="quadrature_allen_cahn",
+        project="quadrature_toy",
         offline=cfg.wandb.offline,
     )
 
