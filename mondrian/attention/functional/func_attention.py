@@ -1,10 +1,11 @@
+import math
 from typing import List, Tuple
 
 import torch
 
 from .func_spda import func_spda_fa, func_spda
 
-def func_attention(query, key, value):
+def func_attention(query, key, value, attn_mask=None):
     r"""
     Args:
         query: [batch, head, seq, channels, ...]
@@ -12,8 +13,8 @@ def func_attention(query, key, value):
         value: [batch, head, seq, channels, ...]
     """
     size = query.size()
-    head_dim = size[3] * size[4] * size[5]
+    head_dim = math.prod(size[3:])
     
     if query.dtype in (torch.float16, torch.bfloat16) and head_dim <= 256:
-        return func_spda_fa(query, key, value)
-    return func_spda(query, key, value)
+        return func_spda_fa(query, key, value, attn_mask)
+    return func_spda(query, key, value, attn_mask)
