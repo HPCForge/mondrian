@@ -1,6 +1,6 @@
 import torch
 
-from mondrian.grid.seq_op import seq_op
+from mondrian.layers.seq_op import seq_op
 
 
 def test_seq_op():

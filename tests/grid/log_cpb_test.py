@@ -1,4 +1,4 @@
-from mondrian.grid.log_cpb import LogCPB
+from mondrian.layers.log_cpb import LogCPB
 
 
 def test_log_cpb():

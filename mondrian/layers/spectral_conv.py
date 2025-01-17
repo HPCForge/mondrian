@@ -12,7 +12,7 @@ from mondrian.layers.seq_op import seq_op
 
 VERSIONS = ["fno", "ffno", "cnn", "random"]
 
-_DEFAULT_SPECTRAL_CONV_MODES = None
+_DEFAULT_SPECTRAL_CONV_MODES = 4
 
 def set_default_spectral_conv_modes(modes: int):
     global _DEFAULT_SPECTRAL_CONV_MODES

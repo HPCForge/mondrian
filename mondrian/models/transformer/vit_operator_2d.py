@@ -38,7 +38,6 @@ class Encoder(nn.Module):
             embed_dim, num_heads, head_split, use_bias
         )
         
-        # One option is to use FNO, but that seems to work really poorly...
         self.mlp = get_default_feed_forward_operator(embed_dim, embed_dim, embed_dim)
         self.norm1 = SequenceGroupNorm2d(8, embed_dim)
         self.norm2 = SequenceGroupNorm2d(8, embed_dim)
@@ -103,7 +102,6 @@ class ViTOperator2d(nn.Module):
             seq_len=max_seq_len, channels=embed_dim
         )
 
-    #@torch.compile
     def forward(self, v: torch.Tensor, domain_size_y: int, domain_size_x: int):
         r"""
         Args:

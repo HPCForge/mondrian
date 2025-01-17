@@ -14,7 +14,7 @@ from neuralop.layers.padding import DomainPadding
 from .feedforward import FeedForward, Linear
 from .linear import WNLinear2d
 
-from mondrian.grid.spectral_conv import FactorizedSpectralConv2d
+from mondrian.layers.spectral_conv import FactorizedSpectralConv2d
 
 
 class FNOFactorized2DBlock(nn.Module):
