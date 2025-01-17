@@ -29,8 +29,7 @@ class SwinFuncSelfAttention(FuncSelfAttention):
 
       if self.shift_size > 0:
         # calculate attention mask for SW-MSA
-        H, W = self.n_sub_y, self.n_sub_x
-        img_mask = torch.zeros((1, 1, H, W))
+        img_mask = torch.zeros((1, 1, self.n_sub_y, self.n_sub_x))
         h_slices = (slice(0, -self.window_size),
                     slice(-self.window_size, -self.shift_size),
                     slice(-self.shift_size, None))
@@ -43,7 +42,7 @@ class SwinFuncSelfAttention(FuncSelfAttention):
                 img_mask[:,:, h, w] = cnt
                 cnt += 1
 
-        mask_windows = win_decompose2d(img_mask, H, W, self.window_size)
+        mask_windows = win_decompose2d(img_mask, self.n_sub_y, self.n_sub_x, self.window_size)
         mask_windows = mask_windows.view(-1, self.window_size * self.window_size)
         
         attn_mask = mask_windows.unsqueeze(1) - mask_windows.unsqueeze(2)
