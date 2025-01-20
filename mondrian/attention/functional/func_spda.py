@@ -5,9 +5,6 @@ import torch
 from torch.nn.functional import scaled_dot_product_attention
 from torch.nn.attention import SDPBackend, sdpa_kernel
 
-from ...grid.quadrature import get_unit_quadrature_weights
-
-
 @torch.compile
 def func_spda_fa(query, key, value, attn_mask):
     r"""
@@ -18,19 +15,21 @@ def func_spda_fa(query, key, value, attn_mask):
     # At such low precisions, the quadrature method shouldn't really matter.
     # flash attention can use a head dimension of 256, but cudnn attention can only use 128.
     assert query.dtype in (torch.float16, torch.bfloat16)
-    
-    discretization = torch.prod(query.size()[4:])
+
+    height = query.size(-2)
+    width = query.size(-1)
 
     with sdpa_kernel(SDPBackend.FLASH_ATTENTION):
         return scaled_dot_product_attention(
-            query.flatten(start_dim=3),
-            key.flatten(start_dim=3),
-            value.flatten(start_dim=3),
+            # TODO: for some reason these don't have stride 1? So need .contiguous
+            query.flatten(start_dim=3).contiguous(),
+            key.flatten(start_dim=3).contiguous(),
+            value.flatten(start_dim=3).contiguous(),
             attn_mask=attn_mask,
             # `query.size(3)` is for normalizing variance (like original transformer paper)
             # This method does not apply quadrature weights to the query, since higher order methods
-            # seem to not matter at lower precisions. So `discrtization` is for the interpretation as an integral.
-            scale=1 / (math.sqrt(query.size(3)) * discretization),
+            # seem to not matter at lower precisions. So `discretization` is for the interpretation as an integral.
+            scale=1 / ((math.sqrt(query.size(3)) * height * width))
         ).reshape(query.size())
         
 @torch.compile
@@ -40,13 +39,8 @@ def func_spda(query, key, value, attn_mask):
     Flattening the channel and spatial dims is safe because they just get reduced.
     """
     
-    # This is memory bound, but could be manually fused into an attention kernel.
-    # From asking on gpu-mode discord, none of torch's attention implementations
-    # can fuse this out of the box. 
     height = query.size(-2)
     width = query.size(-1)
-    quadrature_weights = get_unit_quadrature_weights((height, width), device=query.device)
-    query = query * quadrature_weights
     
     return scaled_dot_product_attention(
         query.flatten(start_dim=3),
@@ -54,5 +48,5 @@ def func_spda(query, key, value, attn_mask):
         value.flatten(start_dim=3),
         attn_mask=attn_mask,
         # since we already apply the quadrature weights, we don't normalize by discretization
-        scale=1 / math.sqrt(query.size(3)),
+        scale=1 / (math.sqrt(query.size(3)) * height * width),
     ).reshape(query.size())

@@ -50,10 +50,7 @@ class BubbleMLEncoder(nn.Module):
             batch_size, self.nuc_embed_dim * self.nuc_embed_dim, 1, 1
         )
 
-        # TODO: Not using nucleation sites atm...
-        return self.backbone_model(x, domain_size_x, domain_size_y)
-
-        #if domain_size_x is not None and domain_size_y is not None:
-        #    return self.backbone_model(x + encoding, domain_size_x, domain_size_y)
-        #else:
-        #    return self.backbone_model(x + encoding)
+        if domain_size_x is not None and domain_size_y is not None:
+            return self.backbone_model(x + encoding, domain_size_x, domain_size_y)
+        else:
+            return self.backbone_model(x + encoding)

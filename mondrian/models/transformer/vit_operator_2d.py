@@ -32,10 +32,10 @@ class SequenceGroupNorm2d(nn.Module):
 
 
 class Encoder(nn.Module):
-    def __init__(self, embed_dim, num_heads, head_split, use_bias):
+    def __init__(self, embed_dim, channel_heads, x_heads, y_heads, use_bias):
         super().__init__()
         self.sa = FuncSelfAttention(
-            embed_dim, num_heads, head_split, use_bias
+            embed_dim, channel_heads, x_heads, y_heads, use_bias
         )
         
         self.mlp = get_default_feed_forward_operator(embed_dim, embed_dim, embed_dim)
@@ -55,8 +55,9 @@ class ViTOperator2d(nn.Module):
         in_channels: int,
         out_channels: int,
         embed_dim: int,
-        num_heads: int,
-        head_split: str,
+        channel_heads: int,
+        x_heads: int,
+        y_heads: int,
         num_layers: int,
         max_seq_len: int,
         subdomain_size: Union[int, Tuple[int, int]],
@@ -90,7 +91,7 @@ class ViTOperator2d(nn.Module):
 
         self.encoder = nn.ModuleList(
             [
-                Encoder(embed_dim, num_heads, head_split, False)
+                Encoder(embed_dim, channel_heads, x_heads, y_heads, False)
                 for _ in range(num_layers)
             ]
         )
@@ -102,6 +103,7 @@ class ViTOperator2d(nn.Module):
             seq_len=max_seq_len, channels=embed_dim
         )
 
+    @torch.compile
     def forward(self, v: torch.Tensor, domain_size_y: int, domain_size_x: int):
         r"""
         Args:
