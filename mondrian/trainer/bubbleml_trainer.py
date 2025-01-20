@@ -46,20 +46,24 @@ class BubbleMLModule(L.LightningModule):
             return self.model(x, nuc)
 
     def _xvel_mse_loss(self, pred, target, stage):
-        loss = F.mse_loss(pred[0::4], target[0::4])
+        s = target.size(0) // 4
+        loss = F.mse_loss(pred[0:s], target[0:s])
         self.log(f'{stage}/MSE-xvel', loss)
 
     def _yvel_mse_loss(self, pred, target, stage):
-        loss = F.mse_loss(pred[1::4], target[1::4])
+        s = target.size(0) // 4
+        loss = F.mse_loss(pred[s:2*s], target[s:2*s])
         self.log(f'{stage}/MSE-yvel', loss)
     
     def _temp_mse_loss(self, pred, target, stage):
-        loss = F.mse_loss(pred[2::4], target[2::4])
+        s = target.size(0) // 4
+        loss = F.mse_loss(pred[2*s:3*s], target[2*s:3*s])
         self.log(f'{stage}/MSE-temp', loss)
     
-    def _dfun_mse_loss(self, pred, target, stage):
-        loss = F.mse_loss(pred[3::4], target[3::4])
-        self.log(f'{stage}/MSE-dfun', loss)
+    def _mask_mse_loss(self, pred, target, stage):
+        s = target.size(0) // 4
+        loss = F.mse_loss(pred[3*s:], target[3*s:])
+        self.log(f'{stage}/MSE-bubbleml-mask', loss)
 
     def _log_vars(self, pred, target, stage):
         self._xvel_mse_loss(pred, target, stage)
