@@ -11,11 +11,11 @@ class ProjectToNewGrid2d(nn.Module):
     r"""
     This uses cross-attention to project to a different discretization.
     """
-    
     def __init__(self,
                  embed_dim,
                  num_heads,
                  scale=None):
+        super().__init__()
         assert embed_dim % num_heads == 0
         self.embed_dim = embed_dim
         self.num_heads = num_heads
@@ -35,7 +35,11 @@ class ProjectToNewGrid2d(nn.Module):
                                 head_dim=self.head_dim)
         return k, v
     
-    def forward(self, f, scale=None, coords=None):
+    def forward(self, f, coords=None):
+        r"""
+        Args:
+            f: [batch, seq, channels, height, width]. This is assumed to be a sequnce of subdomains.
+        """
         assert f.dim() == 5
         assert f.size(-3) == self.embed_dim
         batch_size = f.size(0)
@@ -44,21 +48,21 @@ class ProjectToNewGrid2d(nn.Module):
         width = f.size(-1)
         
         # check scale or coords specified, but not both.
-        scale_input = scale is not None
+        scale_input = self.scale is not None
         coords_input = coords is not None
         assert scale_input != coords_input
         
-        # caller can specify a particular coordinate grid, or say to 
+        # caller can specify a particular coordinate grid, or set scale
         if coords is None:
-            target_height = self.scale * height
-            target_width = self.scale * width
-            coords = cell_centered_unit_grid((target_height, target_width), device=f.device)
+            target_height = int(self.scale * height)
+            target_width = int(self.scale * width)
+            coords = cell_centered_unit_grid((target_height, target_width), device=f.device).permute(1, 2, 0)
         assert coords is not None
-        assert coords.dim() == 3
         assert coords.size(-1) == 2
 
-        
         query = self.q_operator(coords)
+        # add batch and head dimensions, convert points to sequence
+        query = einops.rearrange(query, 'h w (heads d) -> () heads (h w) d', heads=self.num_heads)
         key, value = self._kv(f)
         
         attn = scaled_dot_product_attention(query, key, value)
@@ -68,5 +72,5 @@ class ProjectToNewGrid2d(nn.Module):
         return einops.rearrange(out, '(b s) (h w) c -> b s c h w',
                                 b=batch_size,
                                 s=seq_len,
-                                h=height,
-                                w=width)
+                                h=target_height,
+                                w=target_width)

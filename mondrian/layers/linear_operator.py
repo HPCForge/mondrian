@@ -6,6 +6,7 @@ from torch import nn
 
 from ..grid.utility import cell_centered_unit_grid
 from ..grid.quadrature import get_unit_quadrature_weights
+from .seq_op import seq_op
 
 class NeuralOperator(nn.Sequential):
     def __init__(self, in_channels, out_channels, hidden_channels):
@@ -49,7 +50,7 @@ class LinearOperator2d(LinearOperator2dBase):
     def __init__(self, in_channels, out_channels, bias):
         super().__init__(in_channels, out_channels, bias)
         self.kernel = nn.Sequential(
-            nn.Linear(4, 64),
+            nn.Linear(2, 64),
             nn.GELU(),
             nn.Linear(64, in_channels * out_channels)
         )
@@ -57,10 +58,17 @@ class LinearOperator2d(LinearOperator2dBase):
     def forward(self, v):
         height = v.size(-2)
         width = v.size(-1)
-        coords = cell_centered_unit_grid((height, width, height, width), device=v.device).permute(1, 2, 3, 4, 0)
-        kernel = self.kernel(coords).reshape(height, width, height, width, self.out_channels, self.in_channels)
-        quadrature_weights = get_unit_quadrature_weights((height, width), device=v.device)
-        v = einops.einsum(kernel, quadrature_weights * v, 'h1 w1 h2 w2 o i, ... i h1 w2 -> ... o h2 w2')
+        coords = 2 * cell_centered_unit_grid((height, width), device=v.device).permute(1, 2, 0) - 1
+        coords1 = einops.rearrange(coords, 'h w d -> () () h w d')
+        coords2 = einops.rearrange(coords, 'h w d -> h w () () d')
+        
+        # coords range from -1 to 1
+        # I want points after some distance to not be distinguished.
+        # tanh(2x) essentially makes distant points have similar relative distance
+        rel_dist = torch.tanh(2 * (coords1 - coords2))
+        
+        kernel = self.kernel(rel_dist).reshape(height, width, height, width, self.out_channels, self.in_channels)
+        v = einops.einsum(kernel, v, 'h1 w1 h2 w2 o i, ... i h2 w2 -> ... o h1 w1') / (height * width)
         if self.bias is not None:
             v = v + self.bias
         return v
@@ -69,20 +77,30 @@ class SeparableLinearOperator2d(LinearOperator2dBase):
     def __init__(self, in_channels, out_channels, bias):
         super().__init__(in_channels, out_channels, bias)
         self.kernel = nn.Sequential(
-            nn.Linear(4, 64),
+            nn.Linear(2, 64),
             nn.GELU(),
             nn.Linear(64, in_channels)
         )
-        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size=(1, 1))
+        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size=(1, 1), bias=False)
         
     def forward(self, v):
         height = v.size(-2)
         width = v.size(-1)
-        coords = cell_centered_unit_grid((height, width, height, width), device=v.device).permute(1, 2, 3, 4, 0)
-        kernel = self.kernel(coords).reshape(height, width, height, width, self.in_channels)
-        quadrature_weights = get_unit_quadrature_weights((height, width), device=v.device)
-        v = einops.einsum(kernel, quadrature_weights * v, 'h1 w1 h2 w2 i, ... i h1 w2 -> ... i h2 w2')
-        v = self.conv(v)
+        coords = 2 * cell_centered_unit_grid((height, width), device=v.device).permute(1, 2, 0) - 1
+        coords1 = einops.rearrange(coords, 'h w d -> () () h w d')
+        coords2 = einops.rearrange(coords, 'h w d -> h w () () d')
+        
+        # coords range from -1 to 1
+        # I want points after some distance to not be distinguished.
+        # tanh(2x) essentially makes distant points have similar relative distance
+        #rel_dist = torch.tanh(2 * (coords1 - coords2))
+        
+        # TODO: maybe adjust for finetuning on different resolutions.
+        rel_dist = coords1 - coords2
+        
+        kernel = self.kernel(rel_dist).reshape(height, width, height, width, self.in_channels)
+        v = einops.einsum(kernel, v, 'h1 w1 h2 w2 i, ... i h2 w2 -> ... i h1 w1') / (height * width)
+        v = seq_op(self.conv, v)
         if self.bias is not None:
             v = v + self.bias
         return v
