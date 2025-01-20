@@ -6,7 +6,6 @@ import lightning as L
 from mondrian.metrics import Metrics
 from mondrian.lr_schedule import WarmupCosineAnnealingLR
 
-
 class BubbleMLModule(L.LightningModule):
     def __init__(
         self,
@@ -46,20 +45,45 @@ class BubbleMLModule(L.LightningModule):
         else:
             return self.model(x, nuc)
 
+    def _xvel_mse_loss(self, pred, target, stage):
+        loss = F.mse_loss(pred[0::4], target[0::4])
+        self.log(f'{stage}/MSE-xvel', loss)
+
+    def _yvel_mse_loss(self, pred, target, stage):
+        loss = F.mse_loss(pred[1::4], target[1::4])
+        self.log(f'{stage}/MSE-yvel', loss)
+    
+    def _temp_mse_loss(self, pred, target, stage):
+        loss = F.mse_loss(pred[2::4], target[2::4])
+        self.log(f'{stage}/MSE-temp', loss)
+    
+    def _dfun_mse_loss(self, pred, target, stage):
+        loss = F.mse_loss(pred[3::4], target[3::4])
+        self.log(f'{stage}/MSE-dfun', loss)
+
+    def _log_vars(self, pred, target, stage):
+        self._xvel_mse_loss(pred, target, stage)
+        self._yvel_mse_loss(pred, target, stage)
+        self._temp_mse_loss(pred, target, stage)
+        self._dfun_mse_loss(pred, target, stage)
+
     def training_step(self, batch, batch_idx):
         x, nuc, y = batch
         pred = self.forward(x, nuc)
         loss = self.metrics.log(pred, y, "Train")
+        self._log_vars(pred, y, "Train")
         return loss
 
     def validation_step(self, batch, batch_idx):
         x, nuc, y = batch
         pred = self.forward(x, nuc)
         loss = self.metrics.log(pred, y, "Val")
+        self._log_vars(pred, y, "Val")
         return loss
 
     def test_step(self, batch, batch_idx):
         x, nuc, y = batch
         pred = self.forward(x, nuc)
         loss = self.metrics.log(pred, y, "Test")
+        self._log_vars(pred, y, "Test")
         return loss

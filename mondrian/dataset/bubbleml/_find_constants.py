@@ -4,6 +4,7 @@ This is just a script to find means and extents for each variable in the trainin
 
 import h5py
 from dataclasses import dataclass, asdict
+import numpy as np
 
 
 @dataclass
@@ -39,7 +40,7 @@ def print_dict(d):
 
 
 def main():
-    train_data_path = "/pub/afeeney/Level-Set-Study/simulation/SubcooledBoiling/Train/train_fix_fix.hdf5"
+    train_data_path = "/share/crsp/lab/amowli/share/mondrian/bubbleml/train.hdf5"
     variable_metrics = {}
     with h5py.File(train_data_path, "r") as handle:
         for grp_name in handle.keys():
@@ -63,6 +64,13 @@ def main():
                 var_abs_max = abs(data).max()
                 var_max = data.max()
                 var_min = data.min()
+                #if var == 'dfun':
+                #    print(data.max(), data.min())
+                if var == 'velx' or var == 'vely':
+                    print(f'{var} {np.var(data)}')
+                    
+                    
+                
                 update_metrics(variable_metrics[var], var_count, var_mean, var_abs_max, var_max, var_min)
 
     print_dict(variable_metrics)

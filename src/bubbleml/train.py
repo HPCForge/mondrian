@@ -2,6 +2,7 @@ from omegaconf import OmegaConf
 import hydra
 import time
 import shutil
+import math
 import os
 import pathlib
 
@@ -25,6 +26,10 @@ from mondrian.dataset.bubbleml.bubbleml_forecast_dataset import BubbleMLForecast
 from mondrian.models import get_model
 from mondrian.models.bubbleml_encoder import BubbleMLEncoder
 from mondrian.trainer.bubbleml_trainer import BubbleMLModule
+from mondrian.grid.quadrature import set_default_quadrature_method
+from mondrian.layers.qkv_operator import set_default_qkv_operator
+from mondrian.layers.feed_forward_operator import set_default_feed_forward_operator
+from mondrian.layers.spectral_conv import set_default_spectral_conv_modes
 
 
 @hydra.main(version_base=None, config_path="../../config", config_name="default")
@@ -36,10 +41,15 @@ def main(cfg):
     torch.cuda.manual_seed(cfg.seed)
 
     dtype = torch.float32
+
+    # Enable tf32 tensor cores
     torch.set_float32_matmul_precision("high")
-    # Enable TF32 on matmul and cudnn.
-    # torch.backends.cuda.matmul.allow_tf32 = False
-    # orch.backends.cudnn.allow_tf32 = True
+    
+    # sets the default quadrature method for any integrals evaluated by the model
+    set_default_quadrature_method(cfg.experiment.quadrature_method)
+    set_default_qkv_operator(cfg.experiment.linear_operator)
+    set_default_feed_forward_operator(cfg.experiment.neural_operator)
+    set_default_spectral_conv_modes(cfg.experiment.spectral_conv_modes)
 
     # build experiment dataloaders
     train_loader, val_loader, in_channels, out_channels = get_dataloaders(cfg, dtype)
@@ -51,13 +61,16 @@ def main(cfg):
     # setup lightning module
     max_epochs = int(cfg.experiment.train_cfg.max_epochs)
     max_steps = len(train_loader) * max_epochs
+    # scale by sqrt to preserve effective variance with ddp training
+    lr = math.sqrt(torch.cuda.device_count()) * cfg.experiment.train_cfg.lr
+    warmup_iters = torch.cuda.device_count() * cfg.experiment.train_cfg.warmup_iters
     module = BubbleMLModule(
         model,
         total_iters=max_steps,
         domain_size=cfg.experiment.model_cfg.domain_size,
-        lr=cfg.experiment.train_cfg.lr,
+        lr=lr,
         weight_decay=cfg.experiment.train_cfg.weight_decay,
-        warmup_iters=cfg.experiment.train_cfg.warmup_iters,
+        warmup_iters=warmup_iters,
     )
 
     # setup callbacks
@@ -121,7 +134,8 @@ def copy_to_scratch(filename):
     name = path.name
     tmpdir = os.environ['TMPDIR']
     target_path = f'{tmpdir}/{name}'
-    shutil.copyfile(filename, target_path)
+    if not os.path.exists(target_path):
+        shutil.copyfile(filename, target_path)
     return target_path
 
 def get_dataloaders(cfg, dtype):
@@ -131,6 +145,8 @@ def get_dataloaders(cfg, dtype):
     test_workers = cfg.experiment.test_workers
     
     # copy data into node's scratch memory.
+    #train_path = cfg.experiment.train_data_path
+    #val_path = cfg.experiment.val_data_path
     train_path = copy_to_scratch(cfg.experiment.train_data_path)
     val_path = copy_to_scratch(cfg.experiment.val_data_path)
 
