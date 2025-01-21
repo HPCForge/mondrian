@@ -4,10 +4,8 @@ from typing import List, Tuple
 import h5py
 import numpy as np
 import torch
-from torch import nn
 
 from .constants import (
-    normalize_dfun,
     normalize_temperature,
     normalize_velx,
     normalize_vely,
@@ -69,7 +67,6 @@ class BubbleMLForecastDataset(torch.utils.data.Dataset):
         velx = normalize_velx(grp["velx"][start_time:end_time:step])
         vely = normalize_vely(grp["vely"][start_time:end_time:step])
         temperature = normalize_temperature(grp["temperature"][start_time:end_time:step])
-        #dfun = normalize_dfun(grp["dfun"][start_time:end_time:step])
         dfun = grp["dfun"][start_time:end_time:step]
         bubble_mask = (dfun > 0).astype(float) - 0.5
     
@@ -119,8 +116,6 @@ class BubbleMLForecastDataset(torch.utils.data.Dataset):
         pad_nuc[:nucleation_sites_x.shape[0]] = nucleation_sites_x
         pad_nuc = np.expand_dims(pad_nuc, axis=-1)
         
-        print(input_data[0].min(), input_data[0].max())
-
         return (
             input_data.astype(np.float32),
             pad_nuc.astype(np.float32),

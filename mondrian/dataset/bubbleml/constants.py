@@ -29,13 +29,21 @@ def normalize_temperature(data):
     # a gaussian isn't really possible. 
     # The huge majority of temperature values are around the bulk temperature (~50),
     # and a few are very high (>90) near the heater temperature. 
-    # these numbers are just chosen manually based on a little analysis that at
-    # least get it around zero mean and np.var ~= 1.
-    return (data - 52) / 2.8
-    
+    # having the model predict log(temp) helps a lot with the skew
+    ln50 = np.log(50)
+    ln95 = np.log(95)
+    return (np.log(data) - ln50) / ln95
 
-def normalize_dfun(data):
-    DFUN_MAX = 1.5645649406815259
-    DFUN_MIN = -12.419516294521564
-    x = (data - DFUN_MIN) / (DFUN_MAX - DFUN_MIN)
-    return 2 * x - 1
+
+def unnormalize_velx(data):
+    return data / 2
+
+
+def unnormalize_vely(data):
+    return data / 2
+
+
+def unnormalize_temperature(data):
+    ln50 = np.log(50)
+    ln95 = np.log(95)
+    return np.exp(data * ln95 + ln50)

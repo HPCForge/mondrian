@@ -5,6 +5,32 @@ import lightning as L
 
 from mondrian.metrics import Metrics
 from mondrian.lr_schedule import WarmupCosineAnnealingLR
+from mondrian.dataset.bubbleml.constants import (
+    unnormalize_velx,
+    unnormalize_vely,
+    unnormalize_temperature
+)
+
+def unnormalize_var_metrics(pred, target):
+    assert target.size(1) % 4 == 0 
+    s = target.size(1) // 4
+    velx_pred = unnormalize_velx(pred[:, :s])
+    velx_target = unnormalize_velx(target[:, :s])
+    velx_loss = F.mse_loss(velx_pred, velx_target)
+    
+    vely_pred = unnormalize_vely(pred[:, :s])
+    vely_target = unnormalize_vely(target[:, :s])
+    vely_loss = F.mse_loss(vely_pred, vely_target)
+    
+    temp_pred = unnormalize_temperature(pred[:, 2*s : 3*s].detach().cpu().numpy())
+    temp_target = unnormalize_temperature(target[:, 2*s : 3*s].detach().cpu().numpy())
+    temp_loss = F.mse_loss(torch.from_numpy(temp_pred), torch.from_numpy(temp_target))
+    
+    mask_pred = pred[:, 3*s:]
+    mask_target = target[:, 3*s:]
+    mask_loss = F.mse_loss(mask_pred, mask_target)
+    
+    return velx_loss, vely_loss, temp_loss, mask_loss
 
 class BubbleMLModule(L.LightningModule):
     def __init__(
@@ -45,31 +71,12 @@ class BubbleMLModule(L.LightningModule):
         else:
             return self.model(x, nuc)
 
-    def _xvel_mse_loss(self, pred, target, stage):
-        s = target.size(0) // 4
-        loss = F.mse_loss(pred[0:s], target[0:s])
-        self.log(f'{stage}/MSE-xvel', loss)
-
-    def _yvel_mse_loss(self, pred, target, stage):
-        s = target.size(0) // 4
-        loss = F.mse_loss(pred[s:2*s], target[s:2*s])
-        self.log(f'{stage}/MSE-yvel', loss)
-    
-    def _temp_mse_loss(self, pred, target, stage):
-        s = target.size(0) // 4
-        loss = F.mse_loss(pred[2*s:3*s], target[2*s:3*s])
-        self.log(f'{stage}/MSE-temp', loss)
-    
-    def _mask_mse_loss(self, pred, target, stage):
-        s = target.size(0) // 4
-        loss = F.mse_loss(pred[3*s:], target[3*s:])
-        self.log(f'{stage}/MSE-bubbleml-mask', loss)
-
     def _log_vars(self, pred, target, stage):
-        self._xvel_mse_loss(pred, target, stage)
-        self._yvel_mse_loss(pred, target, stage)
-        self._temp_mse_loss(pred, target, stage)
-        self._dfun_mse_loss(pred, target, stage)
+        velx_loss, vely_loss, temp_loss, mask_loss = unnormalize_var_metrics(pred, target)
+        self.log(f'{stage}/MSE-velx', velx_loss)
+        self.log(f'{stage}/MSE-vely', vely_loss)
+        self.log(f'{stage}/MSE-temp', temp_loss)
+        self.log(f'{stage}/MSE-mask', mask_loss)
 
     def training_step(self, batch, batch_idx):
         x, nuc, y = batch
