@@ -5,20 +5,20 @@ import torch
 from torch import nn
 
 from mondrian.grid.decompose import win_decompose2d, win_recompose2d
-from mondrian.grid.spectral_conv import SimpleSpectralConv2d
 from mondrian.attention.swin_func_self_attention import SwinFuncSelfAttention
-from mondrian.grid.pointwise import PointwiseMLP2d
-from mondrian.grid.seq_op import seq_op
-from mondrian.grid.utility import cell_centered_unit_grid
+from mondrian.layers.seq_op import seq_op
+from mondrian.layers.learned_pos_embedding import LearnedPosEmbedding2d
+from mondrian.layers.feed_forward_operator import get_default_feed_forward_operator
 
-class SequenceInstanceNorm2d(nn.Module):
-  def __init__(self, embed_dim):
-    super().__init__()
-    self.norm = nn.InstanceNorm2d(embed_dim)
-    
-  def forward(self, v):
-    return seq_op(self.norm, v)
-  
+
+class SequenceGroupNorm2d(nn.Module):
+    def __init__(self, num_groups, embed_dim):
+        super().__init__()
+        self.norm = nn.GroupNorm(num_groups, embed_dim)
+
+    def forward(self, v):
+        return seq_op(self.norm, v)
+
 class Encoder(nn.Module):
   def __init__(self, embed_dim, num_heads, head_split, use_bias, shift_size, n_sub_x, n_sub_y, window_size):
     super().__init__()
@@ -26,14 +26,18 @@ class Encoder(nn.Module):
     self.sa = SwinFuncSelfAttention(
       embed_dim, num_heads, head_split, use_bias, shift_size, n_sub_x, n_sub_y, window_size
     )
-    self.mlp = PointwiseMLP2d(embed_dim, embed_dim, embed_dim)
-    self.norm1 = SequenceInstanceNorm2d(embed_dim)
-    self.norm2 = SequenceInstanceNorm2d(embed_dim)
-  
+
+    # One option is to use FNO, but that seems to work really poorly...
+    self.mlp = get_default_feed_forward_operator(embed_dim, embed_dim, embed_dim)
+    self.norm1 = SequenceGroupNorm2d(8, embed_dim)
+    self.norm2 = SequenceGroupNorm2d(8, embed_dim)
+    
   def forward(self, v, n_sub_x, n_sub_y):
-        v = self.sa(self.norm1(v), n_sub_x, n_sub_y) + v
-        v = seq_op(self.mlp, self.norm2(v)) + v
-        return v
+      with torch.profiler.record_function("self_attention"):
+          v = self.sa(self.norm1(v), n_sub_x, n_sub_y) + v
+      with torch.profiler.record_function("mlp"):
+          v = self.mlp(self.norm2(v)) + v
+      return v
 
 class SwinSAOperator2d(nn.Module):
   r""" 
@@ -94,11 +98,11 @@ class SwinSAOperator2d(nn.Module):
       for i in range(num_layers)
     ])
     
-    self.input_project = PointwiseMLP2d(
-            in_channels + 2, embed_dim, hidden_channels=128
-    )
-    self.output_project = PointwiseMLP2d(embed_dim, out_channels, hidden_channels=128)
-    
+    self.input_project = get_default_feed_forward_operator(in_channels, embed_dim, hidden_channels=embed_dim)
+    self.output_project = get_default_feed_forward_operator(embed_dim, out_channels, hidden_channels=embed_dim)
+    self.pos_embedding = LearnedPosEmbedding2d(
+            seq_len=window_size**2, channels=embed_dim
+        )
   def flatten(self, v):
     r"""
     flatten batch and sequence dimensions into one dimension
@@ -118,24 +122,16 @@ class SwinSAOperator2d(nn.Module):
     n_sub_y = domain_size_y // self.sub_size_y
     n_sub_x = domain_size_x // self.sub_size_x
 
-    # concatenate point-wise positions
-    height = v.size(-2)
-    width = v.size(-1)
-    g = 2 * cell_centered_unit_grid(
-        (height, width), device=v.device
-    ) - 1
-    g = einops.repeat(g, "... -> b ...", b=v.size(0))
-    v = torch.cat((g, v), dim=1)
-
-
-    v = self.input_project(v)
     d = win_decompose2d(v, n_sub_x, n_sub_y, self.window_size)
+    d = self.input_project(d)
+    d = self.pos_embedding(d)
 
     for encoder in self.encoder:
       d = encoder(d, n_sub_x, n_sub_y)
       
-    u = win_recompose2d(d, n_sub_x, n_sub_y, self.window_size)
-    u = self.output_project(u)
+    u = self.output_project(d)
+    u = win_recompose2d(u, n_sub_x, n_sub_y, self.window_size)
+    
       
     return u
   
