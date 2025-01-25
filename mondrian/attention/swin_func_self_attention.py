@@ -6,10 +6,13 @@ import torch
 from torch import nn
 from .functional.func_attention import func_attention
 from ..grid.decompose import win_decompose2d, win_recompose2d
-from .func_self_attention import FuncSelfAttention
+from ..layers.log_cpb import LogCPB
+from ..grid.utility import is_power_of_2
+from ..constants import HEAD_SPLIT_OPTIONS
+from ..layers.qkv_operator import get_default_qkv_operator
 
 @torch.compile
-class SwinFuncSelfAttention(FuncSelfAttention):
+class SwinFuncSelfAttention(nn.Module):
   def __init__(
         self,
         embed_dim: int,
@@ -21,7 +24,24 @@ class SwinFuncSelfAttention(FuncSelfAttention):
         n_sub_y: int,
         window_size: int,
     ):
-      super().__init__(embed_dim, num_heads, head_split, use_bias)
+      super().__init__()
+      assert head_split in HEAD_SPLIT_OPTIONS
+      assert is_power_of_2(num_heads)
+      self.embed_dim = embed_dim
+      self.num_heads = num_heads
+      self.head_dim = embed_dim // num_heads
+      assert is_power_of_2(self.head_dim)
+      self.head_split = head_split
+      self.use_bias = use_bias
+      
+      self.qkv_operator = get_default_qkv_operator(embed_dim, 3 * embed_dim, bias=False)
+      self.output_operator = get_default_qkv_operator(embed_dim, embed_dim, bias=True)
+      
+      if use_bias:
+          self.log_cpb = LogCPB(embed_dim, num_heads)
+      else:
+          self.log_cpb = None
+
       self.window_size = window_size
       self.shift_size = shift_size
       self.n_sub_x = n_sub_x
@@ -29,7 +49,8 @@ class SwinFuncSelfAttention(FuncSelfAttention):
 
       if self.shift_size > 0:
         # calculate attention mask for SW-MSA
-        img_mask = torch.zeros((1, 1, self.n_sub_y, self.n_sub_x))
+        H, W = self.n_sub_y, self.n_sub_x
+        img_mask = torch.zeros((1, 1, H, W))
         h_slices = (slice(0, -self.window_size),
                     slice(-self.window_size, -self.shift_size),
                     slice(-self.shift_size, None))
@@ -42,7 +63,7 @@ class SwinFuncSelfAttention(FuncSelfAttention):
                 img_mask[:,:, h, w] = cnt
                 cnt += 1
 
-        mask_windows = win_decompose2d(img_mask, self.n_sub_y, self.n_sub_x, self.window_size)
+        mask_windows = win_decompose2d(img_mask, H, W, self.window_size)
         mask_windows = mask_windows.view(-1, self.window_size * self.window_size)
         
         attn_mask = mask_windows.unsqueeze(1) - mask_windows.unsqueeze(2)
@@ -58,6 +79,12 @@ class SwinFuncSelfAttention(FuncSelfAttention):
         
       self.register_buffer("attn_mask", attn_mask)
   
+  def _qkv(self, v):
+        dims = [1 for _ in range(v.dim())]
+        dims[2] = 3
+        v = self.qkv_operator(v)
+        return v
+
   def _shifted_forward_channel_heads(self, seq, n_sub_x, n_sub_y):
     r"""
     Computes the multihead by partitioning along the channels axis
