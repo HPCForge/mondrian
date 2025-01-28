@@ -103,9 +103,9 @@ class SwinFuncSelfAttention(nn.Module):
         num_heads=self.num_heads,
         head_dim=self.head_dim)
     
-    if self.attn_mask is None:
+    if self.attn_mask is None and self.use_bias:
       bias = self.log_cpb(self.window_size, self.window_size, device=query.device)
-    else:
+    elif self.attn_mask is not None:
       # NOTE: the attn_mask can be different in different windows. So, the bias is computed for each window. 
       # When attention is called, the batch and window dimensions are merged, so we need to repeat the bias to account for this.
       bias = self.attn_mask + self.log_cpb(self.window_size, self.window_size, device=query.device) if self.log_cpb is not None else self.attn_mask
@@ -113,6 +113,8 @@ class SwinFuncSelfAttention(nn.Module):
       n_window = query.size(0) // self.attn_mask.size(0)
       ones = [1 for _ in range(bias.dim() - 1)]
       bias = bias.repeat(n_window, *ones)
+    else:
+      bias = None
       
     sa = func_attention(
         query,
