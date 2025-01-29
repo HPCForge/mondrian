@@ -48,7 +48,7 @@ class GalerkinSelfAttention(nn.Module):
             diagonal_view = torch.diagonal(data)
             diagonal_view += delta
 
-    def forward(self, seq, quadrature_weights):
+    def forward(self, seq):
         r"""
         Args:
           x: [batch, seq, embed]
@@ -65,7 +65,7 @@ class GalerkinSelfAttention(nn.Module):
             value = self.ln_value(value)
 
         ga_heads = galerkin_attention(
-            query, key, value, quadrature_weights
+            query, key, value
         )
         ga = einops.rearrange(ga_heads, "b heads s dim -> b s (heads dim)")
         ga = self.wo(ga)

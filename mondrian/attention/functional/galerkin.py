@@ -4,9 +4,7 @@ import einops
 
 from ...grid.quadrature import get_unit_quadrature_weights
 
-
-@torch.compile
-def galerkin_attention(query, key, value, quadrature_weights):
+def galerkin_attention(query, key, value):
     r"""
     Implements the Galerkin-style attention operation:
       1. https://arxiv.org/pdf/2105.14995
@@ -24,5 +22,5 @@ def galerkin_attention(query, key, value, quadrature_weights):
     Returns:
       [..., s_q, e_v]
     """
-    weights = torch.matmul(key.transpose(-2, -1) * quadrature_weights, value)
-    return torch.matmul(query, weights)
+    weights = torch.matmul(key.transpose(-2, -1), value)
+    return torch.matmul(query, weights) / query.size(-2)
