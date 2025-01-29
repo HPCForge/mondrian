@@ -1,5 +1,6 @@
 from omegaconf import OmegaConf
 import hydra
+import os
 import time
 
 import torch
@@ -35,7 +36,6 @@ def main(cfg):
     torch.cuda.manual_seed(cfg.seed)
 
     dtype = torch.float32
-    # Enable tf32 tensor cores
     torch.set_float32_matmul_precision("high")
     
     # sets the default quadrature method for any integrals evaluated by the model
@@ -64,10 +64,14 @@ def main(cfg):
 
     # setup callbacks
     checkpoint_callback = ModelCheckpoint(
-        save_top_k=1, save_last=True, monitor="Val/L2Error", mode="min"
+        save_top_k=1, 
+        save_last=True, 
+        monitor="Val/L2Error", 
+        mode="min",
+        auto_insert_metric_name=True
     )
     early_stopping_callback = EarlyStopping(
-        monitor="Val/L2Error", min_delta=0.0, patience=25
+        monitor="Val/L2Error", min_delta=0.0, patience=50
     )
     progress_bar_callback = RichProgressBar(
         theme=RichProgressBarTheme(
@@ -92,15 +96,16 @@ def main(cfg):
     ]
 
     # setup logger
-    logger_version = cfg.experiment.logger_version
     model_name = cfg.experiment.model_cfg.name
     lr = cfg.experiment.train_cfg.lr
-    quadrature = cfg.experiment.quadrature_method
     num_params = sum(p.numel() for p in model.parameters())
-    logger_name = f"{model_name}_lr={lr}_params={num_params}_{quadrature}"
+    slurm_job_id = os.environ['SLURM_JOB_ID']
+    logger_name = f"{model_name}_lr={lr}_params={num_params}_jobid={slurm_job_id}_{time.time()}"
     logger = WandbLogger(
+        # what appears on wandb website
         name=logger_name,
-        version=f'{logger_version}_{model_name}_{quadrature}_lr-{lr}_params-{num_params}_{time.time()}',
+        # how it appears in local files
+        version=logger_name,
         project="quadrature_allen_cahn",
         offline=cfg.wandb.offline,
     )

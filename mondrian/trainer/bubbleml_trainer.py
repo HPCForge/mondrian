@@ -1,6 +1,8 @@
+from functools import partial
+
 import torch
 import torch.nn.functional as F
-
+from neuralop.losses.data_losses import LpLoss
 import lightning as L
 
 from mondrian.metrics import Metrics
@@ -11,6 +13,11 @@ from mondrian.dataset.bubbleml.constants import (
     unnormalize_temperature
 )
 
+def relative_mse(pred, target):
+    loss = LpLoss(d=2, reduce_dims=(0, 1), reductions='mean')
+    loss = loss.rel(pred, target)
+    return loss
+
 def unnormalize_var_metrics(pred, target):
     assert target.size(1) % 4 == 0 
     s = target.size(1) // 4
@@ -18,8 +25,8 @@ def unnormalize_var_metrics(pred, target):
     velx_target = unnormalize_velx(target[:, :s])
     velx_loss = F.mse_loss(velx_pred, velx_target)
     
-    vely_pred = unnormalize_vely(pred[:, :s])
-    vely_target = unnormalize_vely(target[:, :s])
+    vely_pred = unnormalize_vely(pred[:, s:2*s])
+    vely_target = unnormalize_vely(target[:, s:2*s])
     vely_loss = F.mse_loss(vely_pred, vely_target)
     
     temp_pred = unnormalize_temperature(pred[:, 2*s : 3*s].detach().cpu().numpy())
@@ -31,6 +38,15 @@ def unnormalize_var_metrics(pred, target):
     mask_loss = F.mse_loss(mask_pred, mask_target)
     
     return velx_loss, vely_loss, temp_loss, mask_loss
+
+def var_losses(pred, target):
+    assert target.size(1) % 4 == 0 
+    s = target.size(1) // 4
+    velx_loss = relative_mse(pred[:, :s], target[:, :s])
+    vely_loss = relative_mse(pred[:, s:2*s], target[:, s:2*s])
+    temp_loss = relative_mse(pred[:, 2*s:3*s], target[:, 2*s:3*s])
+    mask_loss = relative_mse(pred[:, 3*s:], target[:, 3*s:])
+    return (velx_loss + vely_loss + temp_loss + mask_loss)
 
 class BubbleMLModule(L.LightningModule):
     def __init__(
@@ -50,7 +66,8 @@ class BubbleMLModule(L.LightningModule):
         self.lr = lr
         self.weight_decay = weight_decay
         self.warmup_iters = warmup_iters
-        self.metrics = Metrics(self.log)
+        self.log_func = partial(self.log, on_step=False, on_epoch=True)
+        self.metrics = Metrics(self.log_func)
 
     def configure_optimizers(self):
         optimizer = torch.optim.AdamW(
@@ -73,28 +90,34 @@ class BubbleMLModule(L.LightningModule):
 
     def _log_vars(self, pred, target, stage):
         velx_loss, vely_loss, temp_loss, mask_loss = unnormalize_var_metrics(pred, target)
-        self.log(f'{stage}/MSE-velx', velx_loss)
-        self.log(f'{stage}/MSE-vely', vely_loss)
-        self.log(f'{stage}/MSE-temp', temp_loss)
-        self.log(f'{stage}/MSE-mask', mask_loss)
+        self.log_func(f'{stage}/MSE-velx', velx_loss)
+        self.log_func(f'{stage}/MSE-vely', vely_loss)
+        self.log_func(f'{stage}/MSE-temp', temp_loss)
+        self.log_func(f'{stage}/MSE-mask', mask_loss)
 
     def training_step(self, batch, batch_idx):
         x, nuc, y = batch
         pred = self.forward(x, nuc)
-        loss = self.metrics.log(pred, y, "Train")
+        self.metrics.log(pred, y, "Train")
         self._log_vars(pred, y, "Train")
+        loss = var_losses(pred, y)
+        self.log_func(f'Train/rel-loss', loss)
         return loss
 
     def validation_step(self, batch, batch_idx):
         x, nuc, y = batch
         pred = self.forward(x, nuc)
-        loss = self.metrics.log(pred, y, "Val")
+        self.metrics.log(pred, y, "Val")
         self._log_vars(pred, y, "Val")
+        loss = var_losses(pred, y)
+        self.log_func(f'Val/rel-loss', loss)
         return loss
 
     def test_step(self, batch, batch_idx):
         x, nuc, y = batch
         pred = self.forward(x, nuc)
-        loss = self.metrics.log(pred, y, "Test")
+        self.metrics.log(pred, y, "Test")
         self._log_vars(pred, y, "Test")
+        loss = var_losses(pred, y)
+        self.log_func(f'Test/rel-loss', loss)
         return loss

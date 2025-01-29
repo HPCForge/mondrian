@@ -7,8 +7,7 @@ import einops
 from mondrian.attention.galerkin_self_attention import (
     GalerkinSelfAttention,
 )
-from mondrian.grid.quadrature import get_unit_quadrature_weights
-from mondrian.grid.utility import cell_centered_grid
+from mondrian.grid.utility import cell_centered_unit_grid
 from mondrian.models.mlp import MLP
 
 
@@ -20,9 +19,9 @@ class GalerkinEncoder(nn.Module):
         )
         self.mlp = MLP(embed_dim, embed_dim, embed_dim, num_layers=2)
 
-    def forward(self, seq, quadrature_weights):
-        # normalization is applied to K and V inside attn.
-        seq = self.attn(seq, quadrature_weights) + seq
+    def forward(self, seq):
+        # layer normalization is applied to K and V inside attn.
+        seq = self.attn(seq) + seq
         seq = self.mlp(seq) + seq
         return seq
 
@@ -35,18 +34,62 @@ class GalerkinTransformer2d(nn.Module):
         embed_dim,
         num_heads,
         num_layers,
+        pos_method='concat'
     ):
         assert embed_dim % num_heads == 0
         super().__init__()
         self.in_channels = in_channels
         self.out_channels = out_channels
 
-        self.lift = MLP(in_channels + 2, embed_dim, embed_dim)
+        self.pos_method = pos_method
+        if pos_method == 'concat':
+            lift_in_channels = in_channels + 2
+        else:
+            lift_in_channels = in_channels
+
+        self.lift = MLP(lift_in_channels, embed_dim, embed_dim)
         self.project = MLP(embed_dim, out_channels, embed_dim, 2)
+        self.pos_encode = MLP(2, embed_dim, embed_dim)
 
         self.encoders = nn.ModuleList(
             [GalerkinEncoder(embed_dim, num_heads) for _ in range(num_layers)]
         )
+        
+    def forward_with_concat(self, x):
+        height = x.size(2)
+        width = x.size(3)
+        g = 2 * cell_centered_unit_grid((height, width), device=x.device) - 1
+        g = einops.repeat(g, "... -> b ...", b=x.size(0))
+        x = torch.cat((g, x), dim=1)
+        seq = einops.rearrange(x, "b c h w -> b (h w) c")
+        seq = self.lift(seq)
+        for encoder in self.encoders:
+            seq = encoder(seq)
+        seq = self.project(seq)
+        y = einops.rearrange(seq, "b (h w) c -> b c h w", h=height, w=width)
+        return y
+    
+    def forward_with_add(self, x):
+        height = x.size(2)
+        width = x.size(3)
+
+        seq = einops.rearrange(x, "b c h w -> b (h w) c")
+        seq = self.lift(seq)
+        
+        g = 2 * cell_centered_unit_grid(
+            (height, width), device=x.device
+        ) - 1
+        g = einops.rearrange(g, 'd h w -> (h w) d')
+        pos = self.pos_encode(g)
+        
+        for encoder in self.encoders:
+            seq = seq + pos
+            seq = encoder(seq)
+        seq = self.project(seq)
+
+        y = einops.rearrange(seq, "b (h w) c -> b c h w", h=height, w=width)
+
+        return y
 
     def forward(self, x, domain_size_x, domain_size_y):
         r"""
@@ -57,27 +100,6 @@ class GalerkinTransformer2d(nn.Module):
         Returns:
           y: [batch, channels, height, width]
         """
-        height = x.size(2)
-        width = x.size(3)
-        
-        # concatenate point-wise positions
-        g = cell_centered_grid(
-            (height, width), (domain_size_y, domain_size_x), zero_mean=True, device=x.device
-        )
-        g = einops.repeat(g, "... -> b ...", b=x.size(0))
-        x = torch.cat((g, x), dim=1)
-
-        seq = einops.rearrange(x, "b c h w -> b (h w) c")
-
-        # get quadrature weights and flatten in same way as seq
-        quadrature_weights = get_unit_quadrature_weights((height, width), device=x.device)
-        quadrature_weights = einops.rearrange(quadrature_weights, 'h w -> (h w)')
-        
-        seq = self.lift(seq)
-        for encoder in self.encoders:
-            seq = encoder(seq, quadrature_weights)
-        seq = self.project(seq)
-
-        y = einops.rearrange(seq, "b (h w) c -> b c h w", h=height, w=width)
-
-        return y
+        if self.pos_method == 'concat':
+            return self.forward_with_concat(x)
+        return self.forward_with_add(x)

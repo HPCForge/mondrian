@@ -15,7 +15,6 @@ from mondrian.layers.feed_forward_operator import set_default_feed_forward_opera
 @hydra.main(version_base=None, config_path="../../config", config_name="default")
 def main(cfg):
     print(OmegaConf.to_yaml(cfg))
-    # enable using tensor cores
     torch.set_float32_matmul_precision("high")
     
     # sets the default quadrature method for any integrals evaluated by the model
@@ -26,11 +25,17 @@ def main(cfg):
     test_loaders = get_test_loaders(cfg.experiment.test_data_paths)
 
     module = SimpleModule.load_from_checkpoint(cfg.model_ckpt_path)
+    print(module.model)
 
     trainer = L.Trainer(logger=False)
 
     for test_loader in test_loaders:
         trainer.test(module, dataloaders=test_loader)
+        
+    model = module.model
+    num_params = sum(p.numel() for p in model.parameters())
+    print(f'{cfg.experiment.model_cfg.name} has {num_params} parameters')
+
 
 def get_test_loaders(paths):
     print(paths)

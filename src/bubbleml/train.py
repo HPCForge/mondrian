@@ -145,10 +145,10 @@ def get_dataloaders(cfg, dtype):
     test_workers = cfg.experiment.test_workers
     
     # copy data into node's scratch memory.
-    #train_path = cfg.experiment.train_data_path
-    #val_path = cfg.experiment.val_data_path
-    train_path = copy_to_scratch(cfg.experiment.train_data_path)
-    val_path = copy_to_scratch(cfg.experiment.val_data_path)
+    train_path = cfg.experiment.train_data_path
+    val_path = cfg.experiment.val_data_path
+    #train_path = copy_to_scratch(cfg.experiment.train_data_path)
+    #val_path = copy_to_scratch(cfg.experiment.val_data_path)
 
     # get experiment dataset
     train_dataset = BubbleMLForecastDataset(

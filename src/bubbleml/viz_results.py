@@ -8,6 +8,7 @@ import lightning as L
 
 from mondrian.trainer.bubbleml_trainer import BubbleMLModule
 from mondrian.dataset.bubbleml.bubbleml_forecast_dataset import BubbleMLForecastDataset
+from mondrian.dataset.bubbleml.constants import unnormalize_data
 from mondrian.grid.quadrature import set_default_quadrature_method
 from mondrian.layers.qkv_operator import set_default_qkv_operator
 from mondrian.layers.feed_forward_operator import set_default_feed_forward_operator
@@ -46,62 +47,67 @@ def main(cfg):
         label = torch.from_numpy(label)
         
         print(input.size(), label.size())
+        print(input[0:8].min(), input[0:8].max())
+        print(input[8:16].min(), input[8:16].max())
+        print(input[16:24].min(), input[16:24].max())
+        print(input[24:32].min(), input[24:32].max())
         
-        print(input[-1].min(), input[-1].max())
-        print(input[0].min(), input[0].max())
-        print(input[8].min(), input[8].max())
-        print(input[16].min(), input[16].max())
-        print(input[24].min(), input[24].max())
-        #pred = module(input.unsqueeze(0), nuc.unsqueeze(0))
-        #pred = pred.detach()
+        pred = module(input.unsqueeze(0), nuc.unsqueeze(0))
+        pred = pred.detach()
         
-        #plot_results(input.squeeze(), pred.squeeze(), label.squeeze(), i)
+        input = unnormalize_data(input.unsqueeze(0)).squeeze()
+        pred = unnormalize_data(pred)
+        label = unnormalize_data(label.unsqueeze(0)).squeeze()
+                
+        plot_results(input.squeeze(), pred.squeeze(), label.squeeze(), i)
         
 def plot_results(input, output, label, i):
-    fig, axarr = plt.subplots(5, 4)
+    fig, axarr = plt.subplots(5, 4, layout='constrained')
     
     print(output.size(), label.size())
-    
-    print(output[6].min(), output[6].max())
-    print(label[6].min(), label[6].max())
-    
-    axarr[0, 0].imshow(torch.flipud(input[0]), vmin=-1, vmax=1, cmap='turbo')
-    axarr[0, 1].imshow(torch.flipud(input[8]), vmin=-1, vmax=1, cmap='turbo')
-    axarr[0, 2].imshow(torch.flipud(input[16]), cmap=temp_cmap())
-    axarr[0, 3].imshow(torch.flipud(input[24])) 
-    #axarr[0, 4].imshow(torch.flipud(input[32])) 
-    axarr[0, 0].set_ylabel('Input')   
+    print(output.min(), output.max())
 
-    axarr[1, 0].imshow(torch.flipud(output[0]), vmin=-1, vmax=1,  cmap='turbo')
-    axarr[1, 1].imshow(torch.flipud(output[2]), vmin=-1, vmax=1, cmap='turbo')
-    axarr[1, 2].imshow(torch.flipud(output[4]), cmap=temp_cmap())
-    axarr[1, 3].imshow(torch.flipud(output[6]))
-    axarr[1, 0].set_ylabel('Output 25')
+    print('temp')    
+    print(output[16:24].min(), output[16:24].max())
+    print(label[16:24].min(), label[16:24].max())
     
-    axarr[2, 0].imshow(torch.flipud(output[1]), vmin=-1, vmax=1,  cmap='turbo')
-    axarr[2, 1].imshow(torch.flipud(output[3]), vmin=-1, vmax=1,  cmap='turbo')
-    axarr[2, 2].imshow(torch.flipud(output[5]), cmap=temp_cmap())
-    axarr[2, 3].imshow(torch.flipud(output[7]))
-    axarr[2, 0].set_ylabel('Output 50')
+    vel_cmap = 'coolwarm'
 
-    axarr[3, 0].imshow(torch.flipud(label[0]), vmin=-1, vmax=1, cmap='turbo')
-    axarr[3, 1].imshow(torch.flipud(label[2]), vmin=-1, vmax=1, cmap='turbo')
-    axarr[3, 2].imshow(torch.flipud(label[4]), cmap=temp_cmap())
-    axarr[3, 3].imshow(torch.flipud(label[6]))
-    axarr[3, 0].set_ylabel('Label 50')
+    axarr[0, 0].imshow(torch.flipud(input[7]), vmin=-2, vmax=2, cmap=vel_cmap)
+    axarr[0, 1].imshow(torch.flipud(input[15]), vmin=-2, vmax=2, cmap=vel_cmap)
+    axarr[0, 2].imshow(torch.flipud(input[23]), vmin=50, vmax=95, cmap=temp_cmap())
+    axarr[0, 3].imshow(torch.flipud(input[31])) 
+    axarr[0, 0].set_ylabel('Input t')   
+
+    axarr[1, 0].imshow(torch.flipud(output[0]), vmin=-2, vmax=2, cmap=vel_cmap)
+    axarr[1, 1].imshow(torch.flipud(output[8]), vmin=-2, vmax=2, cmap=vel_cmap)
+    axarr[1, 2].imshow(torch.flipud(output[16]), vmin=50, vmax=95, cmap=temp_cmap())
+    axarr[1, 3].imshow(torch.flipud(output[24]), vmin=-0.5, vmax=0.5)
+    axarr[1, 0].set_ylabel('Output t+1')
     
-    axarr[4, 0].imshow(torch.flipud(label[1]), vmin=-1, vmax=1, cmap='turbo')
-    axarr[4, 1].imshow(torch.flipud(label[3]), vmin=-1, vmax=1, cmap='turbo')
-    axarr[4, 2].imshow(torch.flipud(label[5]), cmap=temp_cmap())
-    axarr[4, 3].imshow(torch.flipud(label[7]))
-    axarr[4, 0].set_ylabel('Label 50')
+    axarr[2, 0].imshow(torch.flipud(output[7]), vmin=-2, vmax=2,  cmap=vel_cmap)
+    axarr[2, 1].imshow(torch.flipud(output[15]), vmin=-2, vmax=2,  cmap=vel_cmap)
+    axarr[2, 2].imshow(torch.flipud(output[23]), vmin=50, vmax=95, cmap=temp_cmap())
+    axarr[2, 3].imshow(torch.flipud(output[31]))
+    axarr[2, 0].set_ylabel('Output t+8')
+
+    axarr[3, 0].imshow(torch.flipud(label[0]), vmin=-2, vmax=2, cmap=vel_cmap)
+    axarr[3, 1].imshow(torch.flipud(label[8]), vmin=-2, vmax=2, cmap=vel_cmap)
+    axarr[3, 2].imshow(torch.flipud(label[16]), vmin=50, vmax=95, cmap=temp_cmap())
+    axarr[3, 3].imshow(torch.flipud(label[24]))
+    axarr[3, 0].set_ylabel('Label t+1')
+    
+    axarr[4, 0].imshow(torch.flipud(label[7]), vmin=-2, vmax=2, cmap=vel_cmap)
+    axarr[4, 1].imshow(torch.flipud(label[15]), vmin=-2, vmax=2, cmap=vel_cmap)
+    axarr[4, 2].imshow(torch.flipud(label[23]), vmin=50, vmax=95, cmap=temp_cmap())
+    axarr[4, 3].imshow(torch.flipud(label[31]))
+    axarr[4, 0].set_ylabel('Label t+8')
 
 
     for ax in axarr.ravel():
         ax.set_xticks([])
         ax.set_yticks([])
     
-    plt.tight_layout()
     plt.savefig(f"bubbleml_timestep_{i}.png")
     plt.close()    
 

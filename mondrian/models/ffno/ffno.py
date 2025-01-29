@@ -11,11 +11,11 @@ from torch.nn.functional import gelu
 from einops import rearrange
 from neuralop.layers.padding import DomainPadding
 
-from .feedforward import FeedForward, Linear
-from .linear import WNLinear2d
+from .feedforward import FeedForward
 
 from mondrian.layers.spectral_conv import FactorizedSpectralConv2d
 
+Linear = partial(nn.Conv2d, kernel_size=(1, 1), stride=1, padding=0)
 
 class FNOFactorized2DBlock(nn.Module):
     def __init__(
@@ -76,6 +76,6 @@ class FNOFactorized2DBlock(nn.Module):
         x = self.padding.pad(x)
         for i in range(self.n_layers):
             x = gelu(self.spectral_layers[i](x)) + self.skip_layers[i](x)
-        self.padding.unpad(x)
+        x = self.padding.unpad(x)
         forecast = self.projection(x)
         return forecast

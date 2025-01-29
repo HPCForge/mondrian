@@ -8,7 +8,7 @@ from einops.layers.torch import Rearrange
 from .positional_encoding_module import GaussianFourierFeatureTransform
 from .factorization_module import FABlock2D
 
-from mondrian.grid.utility import cell_centered_grid
+from mondrian.grid.utility import cell_centered_unit_grid
 
 
 class FactorizedTransformer(nn.Module):
@@ -52,7 +52,9 @@ class FactFormer2D(nn.Module):
                  pos_in_dim,
                  pos_out_dim,
                  positional_embedding,
-                 kernel_multiplier):
+                 kernel_multiplier,
+                 resolution=None,
+):
         super().__init__()
         self.in_dim = in_dim
         self.out_dim = out_dim
@@ -61,8 +63,8 @@ class FactFormer2D(nn.Module):
         self.depth = depth  # depth of the encoder transformer
         self.dim_head = dim_head
         
-        # TODO: This is used in the upsample block...
-        #self.resolution = resolution
+        # NOTE: This is used in the upsample block...
+        self.resolution = resolution
 
         self.heads = heads
 
@@ -81,40 +83,40 @@ class FactFormer2D(nn.Module):
             self.depth,
             kernel_multiplier=self.kernel_multiplier,
         )
+        
+        # only use up/down block when resolution is specified.
+        if self.resolution is not None:
+            self.down_block = nn.Sequential(
+                nn.InstanceNorm2d(self.dim),
+                nn.Conv2d(
+                    self.dim, self.dim // 2, kernel_size=3, stride=2, padding=1, bias=True
+                ),
+                nn.GELU(),
+                nn.Conv2d(
+                    self.dim // 2,
+                    self.dim // 2,
+                    kernel_size=3,
+                    stride=1,
+                    padding=1,
+                    bias=True,
+                ),
+            )
 
-        """
-        self.down_block = nn.Sequential(
-            nn.InstanceNorm2d(self.dim),
-            nn.Conv2d(
-                self.dim, self.dim // 2, kernel_size=3, stride=2, padding=1, bias=True
-            ),
-            nn.GELU(),
-            nn.Conv2d(
-                self.dim // 2,
-                self.dim // 2,
-                kernel_size=3,
-                stride=1,
-                padding=1,
-                bias=True,
-            ),
-        )
-
-        self.up_block = nn.Sequential(
-            nn.Upsample(size=(self.resolution, self.resolution), mode="nearest"),
-            nn.Conv2d(
-                self.dim // 2,
-                self.dim // 2,
-                kernel_size=3,
-                stride=1,
-                padding=1,
-                bias=True,
-            ),
-            nn.GELU(),
-            nn.Conv2d(
-                self.dim // 2, self.dim, kernel_size=3, stride=1, padding=1, bias=True
-            ),
-        )
-        """
+            self.up_block = nn.Sequential(
+                nn.Upsample(size=(self.resolution, self.resolution), mode="nearest"),
+                nn.Conv2d(
+                    self.dim // 2,
+                    self.dim // 2,
+                    kernel_size=3,
+                    stride=1,
+                    padding=1,
+                    bias=True,
+                ),
+                nn.GELU(),
+                nn.Conv2d(
+                    self.dim // 2, self.dim, kernel_size=3, stride=1, padding=1, bias=True
+                ),
+            )
 
         self.simple_to_out = nn.Sequential(
             Rearrange("b nx ny c -> b c (nx ny)"),
@@ -140,22 +142,27 @@ class FactFormer2D(nn.Module):
         # domain sizes and making `pos_lst` here.
         height = u.size(-2)
         width = u.size(-1)
-        x = cell_centered_grid(
-            (width,), (domain_size_x,), zero_mean=False, device=u.device
-        ).unsqueeze(-1)
-        y = cell_centered_grid(
-            (height,), (domain_size_y,), zero_mean=False, device=u.device
-        ).unsqueeze(-1)
+        x = 2 * cell_centered_unit_grid(
+            (width,), device=u.device
+        ).unsqueeze(-1) - 1
+        y = 2 * cell_centered_unit_grid(
+            (height,), device=u.device
+        ).unsqueeze(-1) - 1
         pos_lst = [x, y]
         
         u = rearrange(u, "b c h w -> b h w c")
         b, nx, ny, c = u.shape
         u = self.to_in(u)
         u_last = self.encoder(u, pos_lst)
-        #u = rearrange(u_last, "b nx ny c -> b c nx ny")
-        #u = self.down_block(u)
-        #u = self.up_block(u)
-        #u = rearrange(u, "b c nx ny -> b nx ny c")
+        
+        # if an input resolution is specified, we can use
+        # the up.down block.
+        if self.resolution is not None:        
+            u = rearrange(u_last, "b nx ny c -> b c nx ny")
+            u = self.down_block(u)
+            u = self.up_block(u)
+            u = rearrange(u, "b c nx ny -> b nx ny c")
+            
         u = torch.cat([u, u_last], dim=-1)
         u = self.simple_to_out(u)
         u = rearrange(u, "b c (nx ny) -> b c nx ny", nx=nx, ny=ny)

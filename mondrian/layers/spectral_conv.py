@@ -12,7 +12,7 @@ from mondrian.layers.seq_op import seq_op
 
 VERSIONS = ["fno", "ffno", "cnn", "random"]
 
-_DEFAULT_SPECTRAL_CONV_MODES = 4
+_DEFAULT_SPECTRAL_CONV_MODES = 0
 
 def set_default_spectral_conv_modes(modes: int):
     global _DEFAULT_SPECTRAL_CONV_MODES
@@ -20,23 +20,29 @@ def set_default_spectral_conv_modes(modes: int):
     _DEFAULT_SPECTRAL_CONV_MODES = modes
 
 class SpectralConvNeuralOperator(nn.Sequential):
-    def __init__(self, in_channels, out_channels, hidden_channels, version="fno", modes=_DEFAULT_SPECTRAL_CONV_MODES):
+    def __init__(self, 
+                 in_channels,
+                 out_channels,
+                 hidden_channels, 
+                 version="fno"):
         super().__init__(
-            SimpleSpectralConv2d(in_channels, hidden_channels, modes, version=version),
+            SimpleSpectralConv2d(in_channels, hidden_channels, version=version),
             nn.GELU(),
-            SimpleSpectralConv2d(hidden_channels, out_channels, modes, version=version)
+            SimpleSpectralConv2d(hidden_channels, out_channels, version=version)
         )
 
 class SimpleSpectralConv2d(nn.Module):
     def __init__(self, 
                  in_channels, 
                  out_channels, 
-                 n_modes: int = _DEFAULT_SPECTRAL_CONV_MODES, 
+                 n_modes = None,
                  bias: bool = True, 
                  version: str = "fno"):
         super().__init__()
-        assert isinstance(n_modes, int)
         assert version in VERSIONS
+        if n_modes is None:
+            n_modes = _DEFAULT_SPECTRAL_CONV_MODES
+        assert n_modes > 0
         self.in_channels = in_channels
         if version == "fno":
             n_modes = (n_modes, n_modes)

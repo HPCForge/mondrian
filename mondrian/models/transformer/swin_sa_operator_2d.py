@@ -4,6 +4,7 @@ import einops
 import torch
 from torch import nn
 
+from mondrian.grid.utility import cell_centered_unit_grid
 from mondrian.grid.decompose import win_decompose2d, win_recompose2d
 from mondrian.attention.swin_func_self_attention import SwinFuncSelfAttention
 from mondrian.layers.seq_op import seq_op
@@ -122,16 +123,31 @@ class SwinSAOperator2d(nn.Module):
     n_sub_y = domain_size_y // self.sub_size_y
     n_sub_x = domain_size_x // self.sub_size_x
 
+    # concatenate point-wise positions
+    height = v.size(-2)
+    width = v.size(-1)
+    g = 2 * cell_centered_unit_grid(
+        (height, width), device=v.device
+    ) - 1
+    g = einops.repeat(g, "... -> b ...", b=v.size(0))
+    v = torch.cat((g, v), dim=1)
+
+    v = self.input_project(v)
+>>>>>>> d6423f7 (update training scripts and baseline models)
     d = win_decompose2d(v, n_sub_x, n_sub_y, self.window_size)
     d = self.input_project(d)
     d = self.pos_embedding(d)
 
     for encoder in self.encoder:
       d = encoder(d, n_sub_x, n_sub_y)
+<<<<<<< HEAD
       
     u = self.output_project(d)
     u = win_recompose2d(u, n_sub_x, n_sub_y, self.window_size)
     
+    u = win_recompose2d(d, n_sub_x, n_sub_y, self.window_size)
+    u = self.output_project(u)
+>>>>>>> d6423f7 (update training scripts and baseline models)
       
     return u
   

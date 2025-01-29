@@ -1,10 +1,9 @@
 from functools import partial
-
+import einops
 import torch.nn as nn
 
 
-Linear = partial(nn.Conv2d, kernel_size=(1, 1), stride=1, padding=0)
-
+Linear = nn.Linear
 
 class FeedForward(nn.Module):
     def __init__(self, dim, factor, n_layers, layer_norm, dropout):
@@ -27,6 +26,9 @@ class FeedForward(nn.Module):
             )
 
     def forward(self, x):
+        # reshaping for layernorm
+        x = einops.rearrange(x, '... c h w -> ... h w c')
         for layer in self.layers:
             x = layer(x)
+        x = einops.rearrange(x, '... h w c-> ... c h w')
         return x
