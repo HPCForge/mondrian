@@ -1,13 +1,12 @@
 import h5py
 import matplotlib.pyplot as plt
 import numpy as np
-from sklearn.preprocessing import PowerTransformer
-
+from scipy.stats import skew
 
 import sys
 sys.path.append('./')
 
-from plot_utils import temp_cmap
+from plot_utils import temp_cmap, vel_mag_cmap
 
 IMG_TYPE = 'pdf'
 
@@ -29,9 +28,9 @@ def main():
             ax.set_xticks([])
             ax.set_yticks([])
         
-        axarr[0, 0].set_ylabel(r'$\degree 90$')
-        axarr[1, 0].set_ylabel(r'$\degree 92$')
-        axarr[2, 0].set_ylabel(r'$\degree 94$')
+        axarr[0, 0].set_ylabel(r'Heater $\degree 90$')
+        axarr[1, 0].set_ylabel(r'Heater $\degree 92$')
+        axarr[2, 0].set_ylabel(r'Heater $\degree 94$')
         
         axarr[2, 0].set_xlabel('X Velocity')
         axarr[2, 1].set_xlabel('Y Velocity')
@@ -43,11 +42,12 @@ def main():
         plt.close()
         
         timesteps = [120, 140, 160, 180, 200]
-        fig, axarr = plt.subplots(4, len(timesteps))
-        plot_row_time(axarr[0], temp_92['velx'], timesteps, vmin=-2, vmax=2)
-        plot_row_time(axarr[1], temp_92['vely'], timesteps, vmin=-2, vmax=2)
-        plot_row_time(axarr[2], temp_92['temperature'], timesteps, vmin=50, vmax=100, cmap=temp_cmap())
-        plot_row_time(axarr[3], temp_92['dfun'], timesteps, vmin=-12, vmax=1.5)
+        fig, axarr = plt.subplots(4, len(timesteps), layout='constrained')
+        vel_mag = np.sqrt(temp_92['velx'][:] ** 2 + temp_92['vely'][:] ** 2)
+        plot_row_time(fig, axarr[0], temp_92['velx'], timesteps, vmin=-2, vmax=2, cmap='coolwarm')
+        plot_row_time(fig, axarr[1], temp_92['vely'], timesteps, vmin=-2, vmax=2, cmap='coolwarm')
+        plot_row_time(fig, axarr[2], temp_92['temperature'], timesteps, vmin=50, vmax=95, cmap=temp_cmap())
+        plot_row_time(fig, axarr[3], (temp_92['dfun'][:] > 0).astype(np.float32), timesteps, vmin=0, vmax=1)
         
         for ax in axarr.ravel():
             ax.set_xticks([])
@@ -55,8 +55,8 @@ def main():
         
         axarr[0, 0].set_ylabel('X Velocity')
         axarr[1, 0].set_ylabel('Y Velocity')
-        axarr[2, 0].set_ylabel('Temperature')
-        axarr[3, 0].set_ylabel('Distance Func')
+        axarr[2, 0].set_ylabel('Temp.')
+        axarr[3, 0].set_ylabel('Mask')
         
         axarr[3, 0].set_xlabel('Time ' + str(timesteps[0]))
         axarr[3, 1].set_xlabel(timesteps[1])
@@ -64,8 +64,6 @@ def main():
         axarr[3, 3].set_xlabel(timesteps[3])
         axarr[3, 4].set_xlabel(timesteps[4])
 
-
-        plt.tight_layout()
         plt.savefig(f'bubbleml_time.{IMG_TYPE}', bbox_inches='tight')
         plt.close()
         
@@ -83,10 +81,12 @@ def main():
         plt.savefig(f'bubble_dist.{IMG_TYPE}', bbox_inches='tight')
         plt.close()
 
-def plot_row_time(ax, data, timesteps, **kwargs):
+def plot_row_time(fig, ax, data, timesteps, **kwargs):
     for idx, timestep in enumerate(timesteps):
-        ax[idx].imshow(np.flipud(data[timestep]), **kwargs)
-    
+        im = ax[idx].imshow(np.flipud(data[timestep]), **kwargs)
+    vmin = round(kwargs['vmin'], 1)
+    vmax = round(kwargs['vmax'], 1)
+    fig.colorbar(im, ax=ax, ticks=[vmin, vmax], pad=0.025)
 
 def plot_row_variables(ax, data, timestep):
     ax[0].imshow(np.flipud(data['velx'][timestep]))

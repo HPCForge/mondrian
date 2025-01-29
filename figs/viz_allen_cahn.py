@@ -70,10 +70,9 @@ def plt_res_decomp(high_res_image):
         axarr[i].set_xticks([])
         axarr[i].set_yticks([])
 
-    #plt.tight_layout()
     plt.savefig(f'ac_res_decomp.{IMG_TYPE}', bbox_inches='tight')
     
-@hydra.main(version_base=None, config_path="../../config", config_name="default")
+@hydra.main(version_base=None, config_path="../config", config_name="default")
 def main(cfg):
     print(OmegaConf.to_yaml(cfg))
     
