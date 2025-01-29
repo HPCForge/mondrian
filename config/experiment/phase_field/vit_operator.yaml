@@ -1,24 +1,25 @@
 name: allen_cahn
 
-data_path: '/pub/afeeney/project/mondrian/datagen/fdm/fix_allen_cahn_20000_32.hdf5'
+data_path: '/share/crsp/lab/amowli/share/mondrian/allen_cahn/fix_allen_cahn_20000_32.hdf5'
 
 test_data_paths:
-  - '/pub/afeeney/project/mondrian/datagen/fdm/fix_allen_cahn_2000_32.hdf5'
-  - '/pub/afeeney/project/mondrian/datagen/fdm/fix_allen_cahn_2000_64.hdf5'
-  - '/pub/afeeney/project/mondrian/datagen/fdm/fix_allen_cahn_2000_128.hdf5'
+  - '/share/crsp/lab/amowli/share/mondrian/allen_cahn/fix_allen_cahn_2000_32.hdf5'
+  - '/share/crsp/lab/amowli/share/mondrian/allen_cahn/fix_allen_cahn_2000_64.hdf5'
+  - '/share/crsp/lab/amowli/share/mondrian/allen_cahn/fix_allen_cahn_2000_128.hdf5'
 
 logger_version: 'version'
 
 train_workers: 0
 test_workers: 0
 
-quadrature_method: 'reimann'
-#quadrature_method: 'simpson_13'
-#linear_operator: 'low_rank_linear_operator'
-#neural_operator: 'low_rank_neural_operator'
+num_input_timesteps: 8
+input_step_size: 1
+lead_time: 8
 
-linear_operator: 'spectral_conv'
-neural_operator: 'spectral_conv_neural_operator'
+quadrature_method: 'simpson_13'
+linear_operator: 'low_rank_interp_linear_operator'
+neural_operator: 'attention_neural_operator'
+
 spectral_conv_modes: 4
 
 train_cfg:
@@ -26,14 +27,23 @@ train_cfg:
   max_steps: 30000
   lr: 0.001
   weight_decay: 0.01
-  warmup_iters: 2000
+  warmup_iters: 500
 
 model_cfg:
   name: 'vit_operator_2d'
-  embed_dim: 16
-  num_heads: 4
-  head_split: 'channel'
+  embed_dim: 64
+  channel_heads: 4
+  x_heads: 1
+  y_heads: 1
+  attn_neighborhood_radius: null
   num_layers: 4
-  max_seq_len: 64
   subdomain_size: [1, 1]
+  # on 32x32 disc this has 64 subdomains that are 4x4
   domain_size: [8, 8]
+  max_seq_len: 64
+  qkv_config:
+    name: 'separable_random_project_linear_operator'
+    n: 128
+  ff_config:
+    name: 'separable_random_project_neural_operator'
+    n: 128

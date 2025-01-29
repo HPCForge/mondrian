@@ -1,11 +1,11 @@
 name: allen_cahn
 
-data_path: '/pub/afeeney/project/mondrian/datagen/fdm/fix_allen_cahn_20000_32.hdf5'
+data_path: '/share/crsp/lab/amowli/share/mondrian/allen_cahn/fix_allen_cahn_20000_32.hdf5'
 
 test_data_paths:
-  - '/pub/afeeney/project/mondrian/datagen/fdm/fix_allen_cahn_2000_32.hdf5'
-  - '/pub/afeeney/project/mondrian/datagen/fdm/fix_allen_cahn_2000_64.hdf5'
-  - '/pub/afeeney/project/mondrian/datagen/fdm/fix_allen_cahn_2000_128.hdf5'
+  - '/share/crsp/lab/amowli/share/mondrian/allen_cahn/fix_allen_cahn_2000_32.hdf5'
+  - '/share/crsp/lab/amowli/share/mondrian/allen_cahn/fix_allen_cahn_2000_64.hdf5'
+  - '/share/crsp/lab/amowli/share/mondrian/allen_cahn/fix_allen_cahn_2000_128.hdf5'
 
 logger_version: 'version'
 
@@ -22,7 +22,7 @@ train_cfg:
   max_steps: 30000
   lr: 0.001
   weight_decay: 0.01
-  warmup_iters: 2000
+  warmup_iters: 500
 
 model_cfg:
   name: 'swin_sa_operator_2d'

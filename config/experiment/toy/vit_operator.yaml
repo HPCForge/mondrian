@@ -3,6 +3,18 @@ name: allen_cahn
 train_path: '/pub/afeeney/project/mondrian/datagen/toy/train_64.hdf5'
 val_path: '/pub/afeeney/project/mondrian/datagen/toy/val_64.hdf5'
 
+fine_data_paths:
+  - '/pub/afeeney/project/mondrian/datagen/toy/fine_16.hdf5'
+  - '/pub/afeeney/project/mondrian/datagen/toy/fine_32.hdf5'
+  - '/pub/afeeney/project/mondrian/datagen/toy/fine_48.hdf5'
+  - '/pub/afeeney/project/mondrian/datagen/toy/fine_64.hdf5'
+  - '/pub/afeeney/project/mondrian/datagen/toy/fine_80.hdf5'
+  - '/pub/afeeney/project/mondrian/datagen/toy/fine_96.hdf5'
+  - '/pub/afeeney/project/mondrian/datagen/toy/fine_112.hdf5'
+  - '/pub/afeeney/project/mondrian/datagen/toy/fine_128.hdf5'
+  - '/pub/afeeney/project/mondrian/datagen/toy/fine_256.hdf5'
+  - '/pub/afeeney/project/mondrian/datagen/toy/fine_512.hdf5'
+
 test_data_paths:
   - '/pub/afeeney/project/mondrian/datagen/toy/test_16.hdf5'
   - '/pub/afeeney/project/mondrian/datagen/toy/test_32.hdf5'
@@ -11,23 +23,28 @@ test_data_paths:
   - '/pub/afeeney/project/mondrian/datagen/toy/test_80.hdf5'
   - '/pub/afeeney/project/mondrian/datagen/toy/test_96.hdf5'
   - '/pub/afeeney/project/mondrian/datagen/toy/test_112.hdf5'
+  - '/pub/afeeney/project/mondrian/datagen/toy/test_128.hdf5'
+  - '/pub/afeeney/project/mondrian/datagen/toy/test_256.hdf5'
+  - '/pub/afeeney/project/mondrian/datagen/toy/test_512.hdf5'
+
 logger_version: 'version'
 
 train_workers: 0
 test_workers: 0
 
-quadrature_method: 'reimann'
-#quadrature_method: 'simpson_13'
-linear_operator: 'low_rank_linear_operator'
-neural_operator: 'low_rank_neural_operator'
+#quadrature_method: 'reimann'
+quadrature_method: 'simpson_13'
+
+linear_operator: 'linear_operator'
+neural_operator: 'neural_operator'
 spectral_conv_modes: 4
 
 train_cfg:
   batch_size: 128
   max_steps: 30000
-  lr: 0.001
-  weight_decay: 0.01
-  warmup_iters: 2000
+  lr: 0.0001
+  weight_decay: 0.0005
+  warmup_iters: 4
 
 model_cfg:
   name: 'vit_operator_2d'

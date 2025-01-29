@@ -1,26 +1,33 @@
 name: bubbleml
 
-train_data_path: '/pub/afeeney/Level-Set-Study/simulation/SubcooledBoiling/Train/train_fix_fix.hdf5'
-val_data_path: '/pub/afeeney/Level-Set-Study/simulation/SubcooledBoiling/Val/val_fix_fix.hdf5'
-test_data_path: '/pub/afeeney/Level-Set-Study/simulation/SubcooledBoiling/Test/test_fix_fix.hdf5'
+train_data_path: '/share/crsp/lab/amowli/share/mondrian/bubbleml/train.hdf5'
+val_data_path: '/share/crsp/lab/amowli/share/mondrian/bubbleml/val.hdf5'
+test_data_path: '/share/crsp/lab/amowli/share/mondrian/bubbleml/test_temp_scale.hdf5'
 
 train_workers: 8
 test_workers: 8
 
-num_input_timesteps: 4
+logger_version: 'fno'
+
+num_input_timesteps: 8
 input_step_size: 1
 lead_time: 50
 
+quadrature_method: 'reimann'
+linear_operator: 'separable_operator'
+neural_operator: 'separable_neural_operator'
+spectral_conv_modes: 4
+
 train_cfg:
-  batch_size: 32
-  max_epochs: 40
-  lr: 0.001
+  batch_size: 8
+  max_epochs: 50
+  lr: 0.0003
   weight_decay: 0.0001
   warmup_iters: 2000
 
 model_cfg:
   name: 'fno'
-  n_modes: [64, 64]
+  n_modes: [128, 128]
   hidden_channels: 32
   num_layers: 4
   domain_size: null

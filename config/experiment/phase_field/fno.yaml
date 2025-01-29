@@ -1,11 +1,11 @@
 name: allen_cahn
 
-data_path: '/pub/afeeney/project/mondrian/datagen/fdm/fix_allen_cahn_20000_32.hdf5'
+data_path: '/share/crsp/lab/amowli/share/mondrian/allen_cahn/fix_allen_cahn_20000_32.hdf5'
 
 test_data_paths:
-  - '/pub/afeeney/project/mondrian/datagen/fdm/fix_allen_cahn_2000_32.hdf5'
-  - '/pub/afeeney/project/mondrian/datagen/fdm/fix_allen_cahn_2000_64.hdf5'
-  - '/pub/afeeney/project/mondrian/datagen/fdm/fix_allen_cahn_2000_128.hdf5'
+  - '/share/crsp/lab/amowli/share/mondrian/allen_cahn/fix_allen_cahn_2000_32.hdf5'
+  - '/share/crsp/lab/amowli/share/mondrian/allen_cahn/fix_allen_cahn_2000_64.hdf5'
+  - '/share/crsp/lab/amowli/share/mondrian/allen_cahn/fix_allen_cahn_2000_128.hdf5'
 
 logger_version: 'fno'
 
@@ -15,6 +15,7 @@ test_workers: 0
 quadrature_method: 'reimann'
 linear_operator: null
 neural_operator: null
+spectral_conv_modes: 16
 
 train_cfg:
   batch_size: 128
@@ -22,11 +23,11 @@ train_cfg:
   pred_range: 72
   lr: 0.001
   weight_decay: 0.01
-  warmup_iters: 2000
+  warmup_iters: 500
 
 model_cfg:
   name: 'fno'
-  n_modes: [24, 24]
+  n_modes: [16, 16]
   hidden_channels: 32
   num_layers: 4
   domain_size: null

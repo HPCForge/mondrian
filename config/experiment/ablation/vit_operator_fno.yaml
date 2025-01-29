@@ -7,32 +7,38 @@ test_data_paths:
   - '/share/crsp/lab/amowli/share/mondrian/allen_cahn/fix_allen_cahn_2000_64.hdf5'
   - '/share/crsp/lab/amowli/share/mondrian/allen_cahn/fix_allen_cahn_2000_128.hdf5'
 
+logger_version: 'spectral_ablation'
+
 train_workers: 0
 test_workers: 0
 
-logger_version: 'version'
+num_input_timesteps: 8
+input_step_size: 1
+lead_time: 8
 
 quadrature_method: 'reimann'
-linear_operator: null
-neural_operator: null
-spectral_conv_modes: 0
+linear_operator: 'spectral_conv'
+neural_operator: 'spectral_conv_neural_operator'
+
+# These are the modes used in each subdomain.
+# it's just manually set to 1/2 the subdomain size.
+spectral_conv_modes: 16
 
 train_cfg:
   batch_size: 128
   max_steps: 30000
-  pred_range: 72
   lr: 0.001
   weight_decay: 0.01
   warmup_iters: 500
 
 model_cfg:
-  name: 'factformer_2d'
-  depth: 4
-  dim: 32
-  dim_head: 8
-  heads: 4
-  domain_size: [1, 1]
-  # the up/down block needs to know a resolution
-  # when the model is constructed...
-  # if this is null, up/down blocks are not used.
-  resolution: null
+  name: 'vit_operator_padding_2d'
+  embed_dim: 64
+  channel_heads: 4
+  x_heads: 1
+  y_heads: 1
+  attn_neighborhood_radius: null
+  num_layers: 4
+  subdomain_size: [1, 1]
+  domain_size: [2, 2]
+  max_seq_len: 4
