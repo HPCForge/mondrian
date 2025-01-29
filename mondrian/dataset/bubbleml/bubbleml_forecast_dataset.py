@@ -9,6 +9,7 @@ from .constants import (
     normalize_temperature,
     normalize_velx,
     normalize_vely,
+    normalize_dfun
 )
 
 
@@ -17,7 +18,14 @@ def normalize(data, mean, abs_max):
 
 
 class BubbleMLForecastDataset(torch.utils.data.Dataset):
-    def __init__(self, data_path, num_input_timesteps, input_step_size, lead_time):
+    def __init__(
+        self, 
+        data_path, 
+        num_input_timesteps, 
+        input_step_size, 
+        lead_time,
+        use_mask=False
+    ):
         r"""
         Args:
             data_path: path to hdf5 file
@@ -35,11 +43,13 @@ class BubbleMLForecastDataset(torch.utils.data.Dataset):
         self.num_input_timesteps = num_input_timesteps
         self.input_step_size = input_step_size
         self.lead_time = lead_time
+        
+        # toggles if dfun is converted to a mask of bubble posiitions.
+        self.use_mask = use_mask
 
         self.in_channels = 4 * self.num_input_timesteps
         self.out_channels = 4 * self.lead_time
 
-        # TODO: it's actually like 720 or something
         timesteps = 700
 
         max_input_timestep = timesteps - lead_time - 1
@@ -67,10 +77,14 @@ class BubbleMLForecastDataset(torch.utils.data.Dataset):
         velx = normalize_velx(grp["velx"][start_time:end_time:step])
         vely = normalize_vely(grp["vely"][start_time:end_time:step])
         temperature = normalize_temperature(grp["temperature"][start_time:end_time:step])
-        dfun = grp["dfun"][start_time:end_time:step]
-        bubble_mask = (dfun > 0).astype(float) - 0.5
+        dfun = normalize_dfun(grp["dfun"][start_time:end_time:step])
+        
+        #if self.use_mask:
+        #    dfun = (dfun > 0).astype(float) - 0.5
+        #else:
+        #    dfun = normalize_dfun(dfun)
     
-        variables = [velx, vely, temperature, bubble_mask]
+        variables = [velx, vely, temperature, dfun]
         if use_heater_temp:
             # heater temp ranges from 90-100, so just applying a simple normalization
             heater_temp_field = (
