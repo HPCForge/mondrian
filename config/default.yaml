@@ -10,3 +10,4 @@ wandb:
 defaults:
   - _self_
   - experiment:
+  - override hydra/launcher: submitit_slurm
