@@ -5,7 +5,6 @@ import torch
 from torch.nn.functional import scaled_dot_product_attention
 from torch.nn.attention import SDPBackend, sdpa_kernel
 
-@torch.compile
 def func_spda_fa(query, key, value, attn_mask):
     r"""
     computes softmax(QWK^T)V.  The application of the quadrature weights is not fused.
@@ -13,12 +12,13 @@ def func_spda_fa(query, key, value, attn_mask):
     """
     # flash and cudnn attention both require inputs to be half precision or bfloat16.
     # At such low precisions, the quadrature method shouldn't really matter.
-    # flash attention can use a head dimension of 256, but cudnn attention can only use 128.
+    # flash attention can use a head dimension of 256, cudnn attention can only use 128.
     assert query.dtype in (torch.float16, torch.bfloat16)
+    assert math.prod(query.size()[3:]) <= 256
 
     height = query.size(-2)
     width = query.size(-1)
-
+    
     with sdpa_kernel(SDPBackend.FLASH_ATTENTION):
         return scaled_dot_product_attention(
             # TODO: for some reason these don't have stride 1? So need .contiguous
@@ -27,12 +27,10 @@ def func_spda_fa(query, key, value, attn_mask):
             value.flatten(start_dim=3).contiguous(),
             attn_mask=attn_mask,
             # `query.size(3)` is for normalizing variance (like original transformer paper)
-            # This method does not apply quadrature weights to the query, since higher order methods
-            # seem to not matter at lower precisions. So `discretization` is for the interpretation as an integral.
-            scale=1 / ((math.sqrt(query.size(3)) * height * width))
+            # height * width is for interpretation as integral
+            scale=1 / (math.sqrt(query.size(3)) * height * width)
         ).reshape(query.size())
         
-@torch.compile
 def func_spda(query, key, value, attn_mask):
     r"""
     computes softmax(QWK^T)V.  The application of the quadrature weights is not fused.
@@ -47,6 +45,5 @@ def func_spda(query, key, value, attn_mask):
         key.flatten(start_dim=3),
         value.flatten(start_dim=3),
         attn_mask=attn_mask,
-        # since we already apply the quadrature weights, we don't normalize by discretization
         scale=1 / (math.sqrt(query.size(3)) * height * width),
     ).reshape(query.size())

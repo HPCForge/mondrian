@@ -1,13 +1,15 @@
 from neuralop.models import FNO
 from .factformer.factformer import FactorizedTransformer, FactFormer2D
 from .ffno.ffno import FNOFactorized2DBlock
-from .transformer.vit_operator_2d import ViTOperator2d, ViTOperatorFixedPosEmbedding2d
+from .transformer.vit_operator_2d import ViTOperator2d, ViTOperatorFixedPosEmbedding2d, ViTOperatorCoarsen2d, ViTOperatorPadding2d
 from .transformer.galerkin_transformer_2d import GalerkinTransformer2d
 from .transformer.point_transformer_2d import PointTransformer2d
 from .transformer.swin_sa_operator_2d import SwinSAOperator2d
 from .transformer.unet_operator_2d import UnetOperator2d
 
 _VIT_OPERATOR_2D = "vit_operator_2d"
+_VIT_OPERATOR_COARSEN_2D = "vit_operator_coarsen_2d"
+_VIT_OPERATOR_PADDING_2D = "vit_operator_padding_2d"
 _SWIN_SA_OPERATOR_2D = "swin_sa_operator_2d"
 _UNET_OPERATOR_2D = 'unet_operator_2d'
 _VIT_OPERATOR_FIXED_POS_2D = 'vit_operator_fixed_pos_2d'
@@ -20,6 +22,8 @@ _FFNO = "ffno"
 
 MODELS = [
     _VIT_OPERATOR_2D, 
+    _VIT_OPERATOR_COARSEN_2D,
+    _VIT_OPERATOR_PADDING_2D,
     _SWIN_SA_OPERATOR_2D,
     _UNET_OPERATOR_2D,
     _VIT_OPERATOR_FIXED_POS_2D,
@@ -41,6 +45,37 @@ def get_model(in_channels, out_channels, model_cfg):
             channel_heads=model_cfg.channel_heads,
             x_heads=model_cfg.x_heads,
             y_heads=model_cfg.y_heads,
+            attn_neighborhood_radius=model_cfg.attn_neighborhood_radius,
+            num_layers=model_cfg.num_layers,
+            max_seq_len=model_cfg.max_seq_len,
+            subdomain_size=model_cfg.subdomain_size,
+            qkv_config=model_cfg.qkv_config,
+            ff_config=model_cfg.ff_config
+        )
+    if model_cfg.name == _VIT_OPERATOR_COARSEN_2D:
+        return ViTOperatorCoarsen2d(
+            in_channels,
+            out_channels,
+            embed_dim=model_cfg.embed_dim,
+            channel_heads=model_cfg.channel_heads,
+            x_heads=model_cfg.x_heads,
+            y_heads=model_cfg.y_heads,
+            attn_neighborhood_radius=model_cfg.attn_neighborhood_radius,
+            num_layers=model_cfg.num_layers,
+            max_seq_len=model_cfg.max_seq_len,
+            subdomain_size=model_cfg.subdomain_size,
+            qkv_config=model_cfg.qkv_config,
+            ff_config=model_cfg.ff_config
+        )
+    if model_cfg.name == _VIT_OPERATOR_PADDING_2D:
+        return ViTOperatorPadding2d(
+            in_channels,
+            out_channels,
+            embed_dim=model_cfg.embed_dim,
+            channel_heads=model_cfg.channel_heads,
+            x_heads=model_cfg.x_heads,
+            y_heads=model_cfg.y_heads,
+            attn_neighborhood_radius=model_cfg.attn_neighborhood_radius,
             num_layers=model_cfg.num_layers,
             max_seq_len=model_cfg.max_seq_len,
             subdomain_size=model_cfg.subdomain_size,
@@ -89,6 +124,7 @@ def get_model(in_channels, out_channels, model_cfg):
             embed_dim=model_cfg.embed_dim,
             num_heads=model_cfg.num_heads,
             num_layers=model_cfg.num_layers,
+            pos_method=model_cfg.pos_method
         )
     if model_cfg.name == _POINT_TRANSFORMER_2D:
         return PointTransformer2d(
@@ -99,17 +135,19 @@ def get_model(in_channels, out_channels, model_cfg):
             num_layers=model_cfg.num_layers,
         )
     if model_cfg.name == _FACTFORMER_2D:
+        assert int(model_cfg.dim) % int(model_cfg.heads) == 0
         return FactFormer2D(
             in_dim=in_channels,
             out_dim=out_channels,
             dim=model_cfg.dim,
             depth=model_cfg.depth,
-            dim_head=model_cfg.dim_head,
+            dim_head=int(model_cfg.dim) // int(model_cfg.heads),
             heads=model_cfg.heads,
             pos_in_dim=2,
             pos_out_dim=2,
             kernel_multiplier=2,
-            positional_embedding='rotary'
+            positional_embedding='rotary',
+            resolution=model_cfg.resolution
         )
     if model_cfg.name == _FNO:
         return FNO(

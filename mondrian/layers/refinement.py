@@ -1,13 +1,29 @@
 import einops
 import torch
 from torch import nn
-
 from torch.nn.functional import scaled_dot_product_attention
 from torch.nn.attention import SDPBackend, sdpa_kernel
 
 from mondrian.grid.utility import cell_centered_unit_grid
+from mondrian.layers.linear_operator import SeparableRandomProjectLinearOperator
 
-class ProjectToNewGrid2d(nn.Module):
+class LinearProjectToNewGrid2d(nn.Module):
+    def __init__(self,
+                 embed_dim,
+                 scale):
+        super().__init__()
+        assert isinstance(embed_dim, int)
+        assert isinstance(scale, (int, float))
+        self.embed_dim = embed_dim
+        self.scale = scale        
+        self.project = SeparableRandomProjectLinearOperator(
+            self.embed_dim, self.embed_dim, 128, True, scale=self.scale
+        )
+        
+    def forward(self, v):
+        return self.project(v)
+
+class AttentionProjectToNewGrid2d(nn.Module):
     r"""
     This uses cross-attention to project to a different discretization.
     """
@@ -59,14 +75,17 @@ class ProjectToNewGrid2d(nn.Module):
             coords = cell_centered_unit_grid((target_height, target_width), device=f.device).permute(1, 2, 0)
         assert coords is not None
         assert coords.size(-1) == 2
-
+        
         query = self.q_operator(coords)
         # add batch and head dimensions, convert points to sequence
         query = einops.rearrange(query, 'h w (heads d) -> () heads (h w) d', heads=self.num_heads)
+        # flash attn can't broadcast batch dim
+        query = query.expand(batch_size * seq_len, -1, -1, -1)
         key, value = self._kv(f)
         
         attn = scaled_dot_product_attention(query, key, value)
         attn = einops.rearrange(attn, 'bs heads points c -> bs points (heads c)')
+                
         out = self.out_operator(attn)
         
         return einops.rearrange(out, '(b s) (h w) c -> b s c h w',

@@ -15,6 +15,7 @@ def func_attention(query, key, value, attn_mask=None):
     size = query.size()
     head_dim = math.prod(size[3:])
     
-    if query.dtype in (torch.float16, torch.bfloat16) and head_dim <= 256:
-        return func_spda_fa(query, key, value, attn_mask)
+    #assert query.dtype in (torch.float16, torch.bfloat16)
+    #assert head_dim <= 256
+    #return func_spda_fa(query, key, value, attn_mask)
     return func_spda(query, key, value, attn_mask)
