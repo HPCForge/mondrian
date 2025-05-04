@@ -26,7 +26,7 @@ def gaussian_field_2d(grid_res, box_size, k, Pk, seed):
     Returns:
         A numpy array containing the field
     """
-    box_size = 10.0 * box_size
+    box_size = 100 * box_size
     assert np.all(k >= 0)
     df_3d = DFL.gaussian_field_2D(grid_res, k, Pk, 0, seed, box_size, threads=1)
     assert np.isclose(df_3d.mean(), 0, atol=1e-3, rtol=1e-3)
@@ -40,34 +40,58 @@ def allen_cahn_init(grid_res, box_size, power=3, pid=None):
         seed = seed ^ pid
     k = np.arange(1, grid_res + 1).astype(np.float32)
     pk = k**-power
-    
     grf = gaussian_field_2d(grid_res, box_size, k, pk, seed)
-    grf = np.clip(grf, a_min=-0.5, a_max=0.5)
-    
+    #grf = np.clip(grf, a_min=0.001, a_max=.999)
+    #rf = gaussian_filter(grf, sigma=1)
     return grf
 
+def bump(xres, yres, center, sigma):
+    deltax = 2 / xres
+    deltay = 2 / yres
+    x = deltax * (np.arange(0, xres) + 0.5) - 1
+    y = deltay * (np.arange(0, yres) + 0.5) - 1
+    print(x.min(), x.max())
+    x, y = np.meshgrid(x, y, indexing='xy')
+    #n = np.sqrt(x**2 + y**2)
+    #print(n.min(), n.max())
+    return np.exp(- (x - center)**2 / sigma**2) * np.exp(-(y - center)**2 / sigma**2)
+    
+    #return np.exp(1 / (x**2 - 1)) * np.exp(1 / (y**2 - 1))
 
 def solve_allen_cahn(xlim, ylim, xres, yres, pid):
     assert isinstance(xlim, int)
     assert isinstance(ylim, int)
     grid = pde.CartesianGrid(([0, ylim], [0, xlim]), (yres, xres))
+    #field_dim = max(yres, xres)
+    #box_size = max(xlim, ylim)
+    #init = allen_cahn_init(field_dim, box_size, pid=pid)
+    #state_data = init[:yres, :xres]
+    #state_data = bump(xres, yres, 0, 0.5)
+    #state = pde.ScalarField(grid, data=state_data)
+    #print(state_data.min(), state_data.max())
 
-    field_dim = max(yres, xres)
-    box_size = max(xlim, ylim)
-    init = allen_cahn_init(field_dim, box_size, pid=pid)
-    state_data = init[:yres, :xres]
-    state = pde.ScalarField(grid, data=state_data)
+    grid = pde.UnitGrid([32, 32], periodic=False)  # generate grid
+    state = pde.ScalarField.random_uniform(grid)  # generate initial condition
 
     rng = np.random.default_rng(seed=int(time.time()) ^ pid)
-    diffusivity = rng.uniform(low=1e-4, high=5e-3)
+    nu = 1 #rng.uniform(low=1e-4, high=5e-3)
 
-    end_time = 6
+    print('starting_solve')
+
+    end_time = 10
     storage = pde.MemoryStorage()
-    tracker = [storage.tracker(end_time)]
-    eq = pde.AllenCahnPDE(diffusivity, bc={"derivative": 0})
-    eq.solve(state, t_range=end_time, dt=1e-4, adaptive=True, tracker=tracker, backend="numpy")
+    movie_write = pde.MovieStorage("ks.avi", vmin=-1, vmax=1)
+    tracker = [storage.tracker(1), movie_write.tracker(1)]
+    eq = pde.KuramotoSivashinskyPDE(nu, bc={"derivative": 0})
+    eq.solve(state, 
+             t_range=end_time, 
+             dt=1e-2, 
+             solver='crank-nicolson',
+             #adaptive=True,
+             tracker=tracker, 
+             backend="numpy")
 
-    return diffusivity, storage
+    return nu, storage
 
 def cell_centered_points(xlim, ylim, xres, yres):
     delta_x = xlim / xres
@@ -104,7 +128,7 @@ if __name__ == "__main__":
     parser.add_argument('--num_sims', required=True, type=int)
     args = parser.parse_args()
     
-    domain_size = (2, 2)
+    domain_size = (1, 1)
     resolution = (args.sim_res, args.sim_res)
     dataset_size = args.num_sims
     downsample_resolution = (args.down_res, args.down_res)
@@ -118,7 +142,7 @@ if __name__ == "__main__":
         interp_data = interpn((x_coords, y_coords), data, target_coords, bounds_error=False, fill_value=None)
         return interp_data
     
-    with h5py.File(f"./fix_allen_cahn_{args.num_sims}_{args.down_res}.hdf5", "w") as f:
+    with h5py.File(f"./ks_{args.num_sims}_{args.down_res}.hdf5", "w") as f:
         zfill_cnt = len(str(dataset_size))
         xlim, ylim = domain_size
         xres, yres = resolution

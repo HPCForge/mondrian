@@ -1,4 +1,4 @@
-name: allen_cahn
+name: ns
 
 data_path: '/share/crsp/lab/amowli/share/mondrian/allen_cahn/fix_allen_cahn_20000_32.hdf5'
 
@@ -7,36 +7,32 @@ test_data_paths:
   - '/share/crsp/lab/amowli/share/mondrian/allen_cahn/fix_allen_cahn_2000_64.hdf5'
   - '/share/crsp/lab/amowli/share/mondrian/allen_cahn/fix_allen_cahn_2000_128.hdf5'
 
-logger_version: 'version'
-
 train_workers: 0
 test_workers: 0
 
-num_input_timesteps: 8
-input_step_size: 1
-lead_time: 8
+logger_version: 'version'
 
 quadrature_method: 'reimann'
-linear_operator: 'linear_operator'
-neural_operator: 'neural_operator'
-spectral_conv_modes: 4
+linear_operator: null
+neural_operator: null
+spectral_conv_modes: 0
 
 train_cfg:
   batch_size: 128
   max_steps: 30000
+  pred_range: 72
   lr: 0.001
-  weight_decay: 0.001
+  weight_decay: 0.01
   warmup_iters: 500
 
 model_cfg:
-  name: 'vit_operator_coarsen_2d'
-  embed_dim: 64
-  channel_heads: 2
-  x_heads: 2
-  y_heads: 2
-  attn_neighborhood_radius: 2
-  num_layers: 4
-  subdomain_size: [1, 1]
-  # on 64x64 disc this has 64 subdomains that are 8x8
-  domain_size: [8, 8]
-  max_seq_len: 64
+  name: 'factformer_2d'
+  depth: 4
+  dim: 32
+  dim_head: 8
+  heads: 4
+  domain_size: [1, 1]
+  # the up/down block needs to know a resolution
+  # when the model is constructed...
+  # if this is null, up/down blocks are not used.
+  resolution: null

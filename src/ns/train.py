@@ -1,10 +1,9 @@
 from omegaconf import OmegaConf
 import hydra
-import time
-import shutil
-import math
 import os
+import time
 import pathlib
+import shutil
 
 import torch
 from torch.utils.data import DataLoader
@@ -22,15 +21,13 @@ from lightning.pytorch.callbacks.progress.rich_progress import (
 )
 from lightning.pytorch.loggers import WandbLogger
 
-from mondrian.dataset.bubbleml.bubbleml_forecast_dataset import BubbleMLForecastDataset
 from mondrian.models import get_model
-from mondrian.models.bubbleml_encoder import BubbleMLEncoder
-from mondrian.trainer.bubbleml_trainer import BubbleMLModule
+from mondrian.dataset.ns import PDEArenaNSDataset
+from mondrian.trainer.simple_trainer import SimpleModule
 from mondrian.grid.quadrature import set_default_quadrature_method
 from mondrian.layers.qkv_operator import set_default_qkv_operator
 from mondrian.layers.feed_forward_operator import set_default_feed_forward_operator
 from mondrian.layers.spectral_conv import set_default_spectral_conv_modes
-
 
 @hydra.main(version_base=None, config_path="../../config", config_name="default")
 def main(cfg):
@@ -40,11 +37,9 @@ def main(cfg):
     torch.manual_seed(cfg.seed)
     torch.cuda.manual_seed(cfg.seed)
 
-    dtype = torch.float32
+    dtype = torch.bfloat16
+    torch.set_float32_matmul_precision("medium")
 
-    # Enable tf32 tensor cores
-    torch.set_float32_matmul_precision("high")
-    
     # sets the default quadrature method for any integrals evaluated by the model
     set_default_quadrature_method(cfg.experiment.quadrature_method)
     set_default_qkv_operator(cfg.experiment.linear_operator)
@@ -54,31 +49,31 @@ def main(cfg):
     # build experiment dataloaders
     train_loader, val_loader, in_channels, out_channels = get_dataloaders(cfg, dtype)
 
-    # Get model. All models use the BubbleMLEncoder to generically handle the nucleation sites.
-    backbone_model = get_model(64, out_channels, cfg.experiment.model_cfg)
-    model = BubbleMLEncoder(in_channels, out_channels=64, backbone_model=backbone_model)
+    # get model
+    model = get_model(in_channels, out_channels, cfg.experiment.model_cfg)
 
     # setup lightning module
-    max_epochs = int(cfg.experiment.train_cfg.max_epochs)
-    max_steps = len(train_loader) * max_epochs
-    # scale by sqrt to preserve effective variance with ddp training
-    lr = math.sqrt(torch.cuda.device_count()) * cfg.experiment.train_cfg.lr
-    warmup_iters = torch.cuda.device_count() * cfg.experiment.train_cfg.warmup_iters
-    module = BubbleMLModule(
+    max_steps = int(cfg.experiment.train_cfg.max_steps)
+    module = SimpleModule(
         model,
         total_iters=max_steps,
         domain_size=cfg.experiment.model_cfg.domain_size,
-        lr=lr,
+        lr=cfg.experiment.train_cfg.lr,
         weight_decay=cfg.experiment.train_cfg.weight_decay,
-        warmup_iters=warmup_iters,
+        warmup_iters=cfg.experiment.train_cfg.warmup_iters,
+        eta_min=cfg.experiment.train_cfg.eta_min
     )
 
     # setup callbacks
     checkpoint_callback = ModelCheckpoint(
-        save_top_k=1, save_last=True, monitor="Val/L2Error", mode="min"
+        save_top_k=1, 
+        save_last=True, 
+        monitor="Val/L2Error", 
+        mode="min",
+        auto_insert_metric_name=True
     )
     early_stopping_callback = EarlyStopping(
-        monitor="Val/L2Error", min_delta=0.0, patience=25
+        monitor="Val/L2Error", min_delta=0.0, patience=50
     )
     progress_bar_callback = RichProgressBar(
         theme=RichProgressBarTheme(
@@ -105,16 +100,15 @@ def main(cfg):
     # setup logger
     model_name = cfg.experiment.model_cfg.name
     lr = cfg.experiment.train_cfg.lr
-    if "score_method" in cfg.experiment.model_cfg:
-        quadrature = cfg.experiment.model_cfg.score_method
-    else:
-        quadrature = ""
     num_params = sum(p.numel() for p in model.parameters())
-    logger_name = f"{model_name}_lr={lr}_params={num_params}_{quadrature}"
+    slurm_job_id = os.environ['SLURM_JOB_ID']
+    logger_name = f"{model_name}_lr={lr}_params={num_params}_jobid={slurm_job_id}_{time.time()}"
     logger = WandbLogger(
+        # what appears on wandb website
         name=logger_name,
-        version=f'{model_name}_{num_params}_{time.time()}',
-        project="bubbleml",
+        # how it appears in local files
+        version=logger_name,
+        project="ns",
         offline=cfg.wandb.offline,
     )
 
@@ -124,7 +118,7 @@ def main(cfg):
         logger=logger,
         callbacks=callbacks,
         max_steps=max_steps,
-        gradient_clip_val=1.0,
+        gradient_clip_val=0.5,
     )
     trainer.fit(module, train_loader, val_loader)
 
@@ -148,37 +142,27 @@ def get_dataloaders(cfg, dtype):
     #train_path = cfg.experiment.train_data_path
     #val_path = cfg.experiment.val_data_path
     train_path = copy_to_scratch(cfg.experiment.train_data_path)
-    val_path = copy_to_scratch(cfg.experiment.val_data_path)
-
-    # get experiment dataset
-    train_dataset = BubbleMLForecastDataset(
-        train_path, 
-        cfg.experiment.num_input_timesteps, 
-        cfg.experiment.input_step_size, 
-        cfg.experiment.lead_time)
+    dataset = PDEArenaNSDataset(train_path, True)
+    train_size = int(len(dataset) * 0.85)
+    val_size = int(len(dataset) - train_size)
+    train_dataset, val_dataset = torch.utils.data.random_split(
+        dataset, [train_size, val_size]
+    )
+    val_dataset.transform = False
+    in_channels = dataset.in_channels
+    out_channels = dataset.out_channels
     
-    val_dataset = BubbleMLForecastDataset(
-        val_path, 
-        cfg.experiment.num_input_timesteps, 
-        cfg.experiment.input_step_size, 
-        cfg.experiment.lead_time)
-
-    in_channels = train_dataset.in_channels
-    out_channels = train_dataset.out_channels
-
     train_loader = DataLoader(
         train_dataset,
         batch_size=batch_size,
-        shuffle=False,
+        shuffle=True,
         num_workers=train_workers,
-        pin_memory=False,
     )
     val_loader = DataLoader(
         val_dataset,
         batch_size=batch_size,
         shuffle=False,
         num_workers=test_workers,
-        pin_memory=False,
     )
     return train_loader, val_loader, in_channels, out_channels
 

@@ -66,7 +66,7 @@ class BubbleMLModule(L.LightningModule):
         self.lr = lr
         self.weight_decay = weight_decay
         self.warmup_iters = warmup_iters
-        self.log_func = partial(self.log, on_step=False, on_epoch=True)
+        self.log_func = partial(self.log)
         self.metrics = Metrics(self.log_func)
 
     def configure_optimizers(self):
@@ -87,7 +87,7 @@ class BubbleMLModule(L.LightningModule):
             return self.model(x, nuc, self.domain_size[0], self.domain_size[1])
         else:
             return self.model(x, nuc)
-
+    
     def _log_vars(self, pred, target, stage):
         velx_loss, vely_loss, temp_loss, mask_loss = unnormalize_var_metrics(pred, target)
         self.log_func(f'{stage}/MSE-velx', velx_loss)

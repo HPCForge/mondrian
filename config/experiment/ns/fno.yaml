@@ -1,0 +1,33 @@
+name: bubbleml
+
+train_data_path: '/share/crsp/lab/amowli/share/mondrian/ns/ns_decaying.hdf5'
+
+# TODO: these are the same while I test things
+test_data_path: '/share/crsp/lab/amowli/share/mondrian/ns/ns_decaying.hdf5'
+
+train_workers: 8
+test_workers: 8
+
+logger_version: 'fno'
+
+quadrature_method: 'reimann'
+linear_operator: null
+neural_operator: null
+spectral_conv_modes: 0
+
+train_cfg:
+  batch_size: 64
+  max_steps: 100000
+  lr: 0.001
+  weight_decay: 1e-4
+  warmup_iters: 500
+  eta_min: 1e-5
+
+model_cfg:
+  name: 'fno'
+  n_modes: [64, 64]
+  hidden_channels: 32
+  num_layers: 4
+  domain_size: null
+  norm: 'group_norm'
+  domain_padding: 0.0

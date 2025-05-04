@@ -42,7 +42,7 @@ def allen_cahn_init(grid_res, box_size, power=3, pid=None):
     pk = k**-power
     
     grf = gaussian_field_2d(grid_res, box_size, k, pk, seed)
-    grf = np.clip(grf, a_min=-0.5, a_max=0.5)
+    grf = gaussian_filter(grf, sigma=3)
     
     return grf
 
@@ -50,24 +50,36 @@ def allen_cahn_init(grid_res, box_size, power=3, pid=None):
 def solve_allen_cahn(xlim, ylim, xres, yres, pid):
     assert isinstance(xlim, int)
     assert isinstance(ylim, int)
+    rng = np.random.default_rng(seed=int(time.time()) ^ pid)
+    
     grid = pde.CartesianGrid(([0, ylim], [0, xlim]), (yres, xres))
-
     field_dim = max(yres, xres)
     box_size = max(xlim, ylim)
     init = allen_cahn_init(field_dim, box_size, pid=pid)
-    state_data = init[:yres, :xres]
-    state = pde.ScalarField(grid, data=state_data)
+    #state_data = init[:yres, :xres]
+    #print(state_data.min(), state_data.max())
+    state_data = 0.1
+    noise = rng.uniform(low=-0.1, high=0.1, size=(yres, xres))
+    
+    state = pde.ScalarField(grid, data=state_data + noise)
+    #state = pde.ScalarField.random_uniform(grid, -0.01, 0.01)
 
-    rng = np.random.default_rng(seed=int(time.time()) ^ pid)
-    diffusivity = rng.uniform(low=1e-4, high=5e-3)
+    interface_width =  1e-6  #rng.uniform(low=0.1, high=1)
 
-    end_time = 6
+    end_time = 0.1
     storage = pde.MemoryStorage()
     tracker = [storage.tracker(end_time)]
-    eq = pde.AllenCahnPDE(diffusivity, bc={"derivative": 0})
-    eq.solve(state, t_range=end_time, dt=1e-4, adaptive=True, tracker=tracker, backend="numpy")
+    eq = pde.CahnHilliardPDE(1)
+    eq.solve(state,
+             t_range=end_time, 
+             dt=1e-7,
+             solver='crank-nicolson',
+             #adaptive=True, 
+             tracker=tracker, 
+             #backend="numba"
+             )
 
-    return diffusivity, storage
+    return interface_width, storage
 
 def cell_centered_points(xlim, ylim, xres, yres):
     delta_x = xlim / xres

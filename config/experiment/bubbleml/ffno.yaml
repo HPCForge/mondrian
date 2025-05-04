@@ -1,0 +1,32 @@
+name: allen_cahn
+
+train_data_path: '/share/crsp/lab/amowli/share/mondrian/bubbleml/train.hdf5'
+val_data_path: '/share/crsp/lab/amowli/share/mondrian/bubbleml/val.hdf5'
+test_data_path: '/share/crsp/lab/amowli/share/mondrian/bubbleml/test_scale_temp.hdf5'
+
+logger_version: 'fno'
+
+train_workers: 0
+test_workers: 0
+
+quadrature_method: 'reimann'
+linear_operator: null
+neural_operator: null
+spectral_conv_modes: 0
+
+train_cfg:
+  batch_size: 128
+  max_steps: 30000
+  pred_range: 72
+  lr: 0.001
+  weight_decay: 0.01
+  warmup_iters: 500
+
+model_cfg:
+  name: 'ffno'
+  n_modes: 16
+  hidden_channels: 32
+  num_layers: 5
+  domain_size: null
+  layer_norm: True
+  domain_padding: .25

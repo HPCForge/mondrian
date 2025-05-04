@@ -4,8 +4,8 @@ train_data_path: '/share/crsp/lab/amowli/share/mondrian/bubbleml/train.hdf5'
 val_data_path: '/share/crsp/lab/amowli/share/mondrian/bubbleml/val.hdf5'
 test_data_path: '/share/crsp/lab/amowli/share/mondrian/bubbleml/test_scale_temp.hdf5'
 
-train_workers: 8
-test_workers: 8
+train_workers: 16
+test_workers: 16
 
 logger_version: 'version'
 
@@ -21,7 +21,7 @@ spectral_conv_modes: 4
 train_cfg:
   batch_size: 8
   max_epochs: 50
-  lr: 0.0005
+  lr: 0.001
   weight_decay: 0.01
   warmup_iters: 500
 

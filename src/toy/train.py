@@ -26,7 +26,28 @@ from mondrian.grid.quadrature import (
     trapezoid_quadrature_weights,
     simpsons_13_quadrature_weights
 )
+from mondrian.grid.quadrature import set_default_quadrature_method
+from mondrian.layers.qkv_operator import set_default_qkv_operator, get_default_qkv_operator
+from mondrian.layers.feed_forward_operator import set_default_feed_forward_operator, get_default_feed_forward_operator
+from mondrian.layers.spectral_conv import set_default_spectral_conv_modes
+from mondrian.layers.linear_operator import LinearOperator2d
+from mondrian.attention.func_self_attention import FuncSelfAttention
+from mondrian.grid.decompose import decompose2d, recompose2d
 
+class Model(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.l1 = torch.nn.Conv2d(1, 32, kernel_size=1)
+        self.l2 = FuncSelfAttention(32, 4, 'channel', False)
+        self.l3 = torch.nn.Conv2d(32, 1, kernel_size=1)
+    
+    def forward(self, x, n, m):
+        x = self.l1(x)
+        x = decompose2d(x, n, m)
+        x = self.l2(x, n, m)
+        x = recompose2d(x, n, m)
+        x = self.l3(x)
+        return x
 
 @hydra.main(version_base=None, config_path="../../config", config_name="default")
 def main(cfg):
@@ -35,14 +56,22 @@ def main(cfg):
     # need to set seeds for distributed training
     torch.manual_seed(cfg.seed)
     torch.cuda.manual_seed(cfg.seed)
-
+    
+    torch.set_float32_matmul_precision("high")
+    
     dtype = torch.float32
-    torch.set_float32_matmul_precision("medium")
+    # sets the default quadrature method for any integrals evaluated by the model
+    set_default_quadrature_method(cfg.experiment.quadrature_method)
+    set_default_qkv_operator(cfg.experiment.linear_operator)
+    set_default_feed_forward_operator(cfg.experiment.neural_operator)
+    set_default_spectral_conv_modes(cfg.experiment.spectral_conv_modes)
 
     # build experiment dataloaders
     train_loader, val_loader, in_channels, out_channels = get_dataloaders(cfg, dtype)
 
     # get model
+    #model = Model()
+    model = get_default_feed_forward_operator(1, 1, 64)
     model = get_model(in_channels, out_channels, cfg.experiment.model_cfg)
     print(model)
 
@@ -62,7 +91,7 @@ def main(cfg):
         save_top_k=1, save_last=True, monitor="Val/L2Error", mode="min"
     )
     early_stopping_callback = EarlyStopping(
-        monitor="Val/L2Error", min_delta=0.0, patience=25
+        monitor="Val/L2Error", min_delta=0.0, patience=50
     )
     progress_bar_callback = RichProgressBar(
         theme=RichProgressBarTheme(
@@ -131,14 +160,12 @@ def get_dataloaders(cfg, dtype):
         batch_size=batch_size,
         shuffle=True,
         num_workers=train_workers,
-        pin_memory=True,
     )
     val_loader = DataLoader(
         val_dataset,
         batch_size=batch_size,
         shuffle=False,
         num_workers=test_workers,
-        pin_memory=True,
     )
     return train_loader, val_loader, in_channels, out_channels
 

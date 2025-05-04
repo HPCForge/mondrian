@@ -1,0 +1,38 @@
+name: ns
+
+data_path: '/share/crsp/lab/amowli/share/mondrian/allen_cahn/fix_allen_cahn_20000_32.hdf5'
+
+test_data_paths:
+  - '/share/crsp/lab/amowli/share/mondrian/allen_cahn/fix_allen_cahn_2000_32.hdf5'
+  - '/share/crsp/lab/amowli/share/mondrian/allen_cahn/fix_allen_cahn_2000_64.hdf5'
+  - '/share/crsp/lab/amowli/share/mondrian/allen_cahn/fix_allen_cahn_2000_128.hdf5'
+
+train_workers: 0
+test_workers: 0
+
+logger_version: 'version'
+
+quadrature_method: 'reimann'
+linear_operator: null
+neural_operator: null
+spectral_conv_modes: 0
+
+train_cfg:
+  batch_size: 128
+  max_steps: 30000
+  pred_range: 72
+  lr: 0.001
+  weight_decay: 0.01
+  warmup_iters: 500
+
+model_cfg:
+  name: 'factformer_2d'
+  depth: 4
+  dim: 32
+  dim_head: 8
+  heads: 4
+  domain_size: [1, 1]
+  # the up/down block needs to know a resolution
+  # when the model is constructed...
+  # if this is null, up/down blocks are not used.
+  resolution: null

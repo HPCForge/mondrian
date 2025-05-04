@@ -44,6 +44,10 @@ class Metrics:
         )
 
         l1_err = l1_error(input, target)
-        self.log_func(f"{stage}/L1Error", l1_err.detach(), batch_size=batch_size, on_step=False, on_epoch=True)
+        self.log_func(f"{stage}/L1Error", 
+                      l1_err.detach(), 
+                      batch_size=batch_size, 
+                      on_step=False, 
+                      on_epoch=True)
 
         return l2_err

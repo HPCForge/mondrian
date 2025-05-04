@@ -1,3 +1,4 @@
+import einops
 import numpy
 import scipy.fftpack
 from numpy.random import default_rng
@@ -34,29 +35,44 @@ def sin_data(d):
     x, y = torch.meshgrid(x, x, indexing='xy')
     return torch.exp(1.2 * x * y).unsqueeze(0).unsqueeze(0)
 
+def poly_data(d):
+    delta = 1 / d
+    x = 2 * delta * (torch.arange(0, d) + 0.5)
+    y = 4 * delta * (torch.arange(0, d) + 0.5) + 1
+    x, y = torch.meshgrid(x, y, indexing='xy')
+    return einops.rearrange(x ** 2 * y ** 3, 'h w -> () () h w')
+    #return einops.rearrange(15 * x**2 + 17 * x * y + 24 * y**2 + x + y + 1, 'h w -> () () h w')
+
+def run_model(model, data, steps):
+    for _ in range(steps):
+        data = model(data)
+    return data
+
 def test(model, data_func, default_quad):
     r"""
     This basically checks how quickly a model spits out a
     decent approximation of the high resolution data, when using different integration methods.
     I.e., a simpsons method is accurate quickly, so it should reach a better approximation, at lower resolutions.
     """
+    set_default_quadrature_method('simpson_13')
+    steps = 1
+    target = run_model(model, data_func(64).cuda(), steps)
+    
     set_default_quadrature_method(default_quad)
-    target = model(data_func(400).cuda())
     from mondrian.grid.quadrature import DEFAULT_QUADRATURE_METHOD
     print(default_quad, DEFAULT_QUADRATURE_METHOD)
     print(f'  - target: {target.mean()}')
-    for res in [3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 51, 71, 91, 129]:
+    for res in [3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 32]:
         data = data_func(res).cuda()
-        print(data.min(), data.max())
-        out = model(data)
+        out = run_model(model, data, steps)
         print(f' - {res} estimate: {integrate(out)}, {integrate(target)} error: {abs(integrate(target) - integrate(out))}')
 
 def main():
-    set_default_qkv_operator('low_rank_linear_operator')
-    set_default_feed_forward_operator('low_rank_neural_operator')
+    set_default_qkv_operator('linear_operator')
+    set_default_feed_forward_operator('neural_operator')
     torch.manual_seed(0)
     
-    data_func = sin_data
+    data_func = poly_data
 
     with torch.no_grad():    
         model = get_default_qkv_operator(1, 1, bias=True).cuda()
@@ -68,7 +84,7 @@ def main():
     
     plt.imshow(sample.squeeze().detach().cpu())
     plt.savefig('sample.png')
-    
+
 if __name__ == '__main__':
     main()
 

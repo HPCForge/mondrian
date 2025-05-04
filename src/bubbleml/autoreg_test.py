@@ -9,7 +9,7 @@ import lightning as L
 
 from mondrian.trainer.bubbleml_trainer import BubbleMLModule
 from mondrian.dataset.bubbleml.bubbleml_forecast_dataset import BubbleMLForecastDataset
-from mondrian.dataset.bubbleml.constants import unnormalize_temperature
+from mondrian.dataset.bubbleml.constants import unnormalize_data
 from mondrian.grid.quadrature import set_default_quadrature_method
 from mondrian.layers.qkv_operator import set_default_qkv_operator
 from mondrian.layers.feed_forward_operator import set_default_feed_forward_operator
@@ -17,7 +17,7 @@ from mondrian.layers.spectral_conv import set_default_spectral_conv_modes
 
 import sys
 sys.path.append("./")
-from plot_utils import temp_cmap
+from plot_utils import temp_cmap, vel_cmap, dfun_cmap
 
 def denormalize_temp_grad(temp, t_wall, bulk_temp, thermal_conductivity):
     r"""
@@ -42,6 +42,9 @@ def subcooled_heatflux(temp, dfun, t_wall, x, dy):
     bulk_temp = 50
     thermal_conductivity = 0.054
     
+    delta = 1 / 384
+    x = delta * np.arange()
+    
     d_temp = denormalize_temp_grad(temp[:, 0], t_wall, bulk_temp, thermal_conductivity)
     heater_mask = (x >= -2.5) & (x <= 2.5)
     liquid_mask = dfun < 0
@@ -65,47 +68,82 @@ def main(cfg):
 
     module = BubbleMLModule.load_from_checkpoint(cfg.model_ckpt_path)
     module = module
-    
+
     print(cfg)
 
     dataset = BubbleMLForecastDataset(cfg.experiment.test_data_path,
                                       cfg.experiment.num_input_timesteps,
                                       cfg.experiment.input_step_size,
                                       cfg.experiment.lead_time)
-    
+
     with torch.no_grad():
+        rollout_velx_pred = []
+        rollout_vely_pred = []
         rollout_temp_pred = []
+        rollout_dfun_pred = []
+
+        rollout_velx_label = []
+        rollout_vely_label = []
         rollout_temp_label = []
-        
+        rollout_dfun_label = []
+
         start_time = 100
         end_time = 300
         input, nuc, _ = dataset[start_time]
         input = torch.from_numpy(input).unsqueeze(0).cuda()
         nuc = torch.from_numpy(nuc).unsqueeze(0).cuda()
-        
-        imin, imax = 0, 8
 
-        rollout_temp_pred.append(unnormalize_temperature(input[:, imin:imax].detach().cpu().numpy()))
-        rollout_temp_label.append(unnormalize_temperature(input[:, imin:imax].detach().cpu().numpy()))
-        
+        rollout_velx_pred.append(unnormalize_data(input.detach().cpu().numpy())[:, 0:8])
+        rollout_vely_pred.append(unnormalize_data(input.detach().cpu().numpy())[:, 8:16])
+        rollout_temp_pred.append(unnormalize_data(input.detach().cpu().numpy())[:, 16:24])
+        rollout_dfun_pred.append(unnormalize_data(input.detach().cpu().numpy())[:, 24:32])
+
+        rollout_velx_label.append(unnormalize_data(input.detach().cpu().numpy())[:, 0:8])
+        rollout_vely_label.append(unnormalize_data(input.detach().cpu().numpy())[:, 8:16])
+        rollout_temp_label.append(unnormalize_data(input.detach().cpu().numpy())[:, 16:24])
+        rollout_dfun_label.append(unnormalize_data(input.detach().cpu().numpy())[:, 24:32])
+
         for idx in range(start_time, end_time, cfg.experiment.lead_time):
             _, _, label = dataset[idx]
             label = torch.from_numpy(label).unsqueeze(0).cuda()
             input = module.forward(input, nuc)
             
-            rollout_temp_pred.append(unnormalize_temperature(input[:, imin:imax].detach().cpu().numpy()))
-            rollout_temp_label.append(unnormalize_temperature(label[:, imin:imax].detach().cpu().numpy()))
-            
-        rollout_temp_pred = np.concatenate(rollout_temp_pred, axis=1).squeeze(0)
-        rollout_temp_label = np.concatenate(rollout_temp_label, axis=1).squeeze(0)
-        
+            rollout_velx_pred.append(unnormalize_data(input.detach().cpu().numpy())[:, 0:8])
+            rollout_vely_pred.append(unnormalize_data(input.detach().cpu().numpy())[:, 8:16])
+            rollout_temp_pred.append(unnormalize_data(input.detach().cpu().numpy())[:, 16:24])
+            rollout_dfun_pred.append(unnormalize_data(input.detach().cpu().numpy())[:, 24:32])
+
+            rollout_velx_label.append(unnormalize_data(label.detach().cpu().numpy())[:, 0:8])
+            rollout_vely_label.append(unnormalize_data(label.detach().cpu().numpy())[:, 8:16])
+            rollout_temp_label.append(unnormalize_data(label.detach().cpu().numpy())[:, 16:24])
+            rollout_dfun_label.append(unnormalize_data(label.detach().cpu().numpy())[:, 24:32])
+
+        rollout_velx_pred = np.concatenate(rollout_velx_pred, axis=1).squeeze(0)
+        rollout_vely_pred = np.concatenate(rollout_vely_pred, axis=1).squeeze(0)
+        rollout_temp_pred = np.concatenate(rollout_temp_pred, axis=1).squeeze(0)    
+        rollout_dfun_pred = np.concatenate(rollout_dfun_pred, axis=1).squeeze(0)
+
+        rollout_velx_label = np.concatenate(rollout_velx_label, axis=1).squeeze(0)
+        rollout_vely_label = np.concatenate(rollout_vely_label, axis=1).squeeze(0)
+        rollout_temp_label = np.concatenate(rollout_temp_label, axis=1).squeeze(0)    
+        rollout_dfun_label = np.concatenate(rollout_dfun_label, axis=1).squeeze(0)
+
     for idx in range(rollout_temp_pred.shape[0]):
-        fig, axarr = plt.subplots(1, 2)
-        axarr[0].imshow(np.flipud(rollout_temp_pred[idx]), vmin=50, vmax=95, cmap=temp_cmap())
-        axarr[1].imshow(np.flipud(rollout_temp_label[idx]), vmin=50, vmax=95, cmap=temp_cmap())
-        for i in range(len(axarr)):
-            axarr[i].set_xticks([])
-            axarr[i].set_yticks([])
+        fig, axarr = plt.subplots(2, 4)
+        axarr[0, 0].imshow(np.flipud(rollout_velx_pred[idx]), vmin=-2, vmax=2, cmap=vel_cmap())
+        axarr[0, 1].imshow(np.flipud(rollout_vely_pred[idx]), vmin=-2, vmax=2, cmap=vel_cmap())
+        axarr[0, 2].imshow(np.flipud(rollout_temp_pred[idx]), vmin=50, vmax=95, cmap=temp_cmap())
+        axarr[0, 3].imshow(np.flipud(rollout_dfun_pred[idx]) > 0, cmap=dfun_cmap())
+
+        axarr[1, 0].imshow(np.flipud(rollout_velx_label[idx]), vmin=-2, vmax=2, cmap=vel_cmap())
+        axarr[1, 1].imshow(np.flipud(rollout_vely_label[idx]), vmin=-2, vmax=2, cmap=vel_cmap())
+        axarr[1, 2].imshow(np.flipud(rollout_temp_label[idx]), vmin=50, vmax=95, cmap=temp_cmap())
+        axarr[1, 3].imshow(np.flipud(rollout_dfun_label[idx]) > 0, cmap=dfun_cmap())
+
+        for ax in axarr.ravel():
+            ax.set_xticks([])
+            ax.set_yticks([])
+
         idx = str(idx).zfill(4)
         plt.savefig(f'br/br_{idx}.png')
         plt.close()
