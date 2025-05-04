@@ -4,7 +4,9 @@ from mondrian.dataset.bubbleml.constants import (
     normalize_temperature,
     unnormalize_velx,
     unnormalize_vely,
-    unnormalize_temperature
+    unnormalize_temperature,
+    normalize_dfun,
+    unnormalize_dfun
 )
 
 def test_normalization():

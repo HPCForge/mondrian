@@ -23,25 +23,24 @@ class SpectralConvNeuralOperator(nn.Sequential):
     def __init__(self, 
                  in_channels,
                  out_channels,
-                 hidden_channels, 
+                 hidden_channels,
+                 n_modes,
                  version="fno"):
         super().__init__(
-            SimpleSpectralConv2d(in_channels, hidden_channels, version=version),
+            SimpleSpectralConv2d(in_channels, hidden_channels, n_modes=n_modes, version=version),
             nn.GELU(),
-            SimpleSpectralConv2d(hidden_channels, out_channels, version=version)
+            SimpleSpectralConv2d(hidden_channels, out_channels, n_modes=n_modes, version=version)
         )
 
 class SimpleSpectralConv2d(nn.Module):
     def __init__(self, 
                  in_channels, 
                  out_channels, 
-                 n_modes = None,
+                 n_modes,
                  bias: bool = True, 
                  version: str = "fno"):
         super().__init__()
         assert version in VERSIONS
-        if n_modes is None:
-            n_modes = _DEFAULT_SPECTRAL_CONV_MODES
         assert n_modes > 0
         self.in_channels = in_channels
         if version == "fno":

@@ -89,7 +89,10 @@ class FuncSelfAttention(nn.Module):
         """
         seq = self._qkv(seq)
         
-        seq_heads = decompose2d(seq, self.x_heads, self.y_heads)
+        if self.x_heads > 1 or self.y_heads > 1:
+            seq_heads = decompose2d(seq, self.x_heads, self.y_heads)
+        else:
+            seq_heads = einops.rearrange(seq, 'b s ... -> b s () ...')
             
         query, key, value = einops.rearrange(
             seq_heads, 

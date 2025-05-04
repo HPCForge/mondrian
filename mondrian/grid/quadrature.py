@@ -136,7 +136,7 @@ def simpsons_13_quadrature_weights(
 
     for dim in range(dims):                
         w = simpson_interior_weights_1d(grid_spatial_dimensions[dim], grid_discretization_dimensions[dim], device=device)
-        w = apply_linear_boundary_weights2(w, grid_spatial_dimensions[dim], grid_discretization_dimensions[dim])
+        w = apply_linear_boundary_weights(w, grid_spatial_dimensions[dim], grid_discretization_dimensions[dim])
         # this makes a tensor of size [1, 1, ..., size, ..., 1, 1]
         # this is so it will be broadcasted along the desired axis of weights.
         size = [1 for _ in range(dims)]

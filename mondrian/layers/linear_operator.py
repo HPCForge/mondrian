@@ -17,24 +17,30 @@ class NeuralOperator(nn.Sequential):
     def __init__(self, in_channels, out_channels, hidden_channels):
         super().__init__(
             LinearOperator2d(in_channels, hidden_channels, bias=True),
+            torch.nn.Dropout(p=0.1),
             nn.GELU(),
             LinearOperator2d(hidden_channels, out_channels, bias=True),
+            torch.nn.Dropout(p=0.1)
         )
 
 class RandomProjectNeuralOperator(nn.Sequential):
     def __init__(self, in_channels, out_channels, hidden_channels, n):
         super().__init__(
             RandomProjectLinearOperator(in_channels, hidden_channels, n, bias=True),
+            torch.nn.Dropout(p=0.1),
             nn.GELU(),
             RandomProjectLinearOperator(hidden_channels, out_channels, n, bias=True),
+            torch.nn.Dropout(p=0.1),
         )
 
 class SeparableRandomProjectNeuralOperator(nn.Sequential):
     def __init__(self, in_channels, out_channels, hidden_channels, n):
         super().__init__(
             SeparableRandomProjectLinearOperator(in_channels, hidden_channels, n, bias=True),
+            torch.nn.Dropout(p=0.1),
             nn.GELU(),
             SeparableRandomProjectLinearOperator(hidden_channels, out_channels, n, bias=True),
+            torch.nn.Dropout(p=0.1),
         )
 
 class LowRankNeuralOperator(nn.Sequential):

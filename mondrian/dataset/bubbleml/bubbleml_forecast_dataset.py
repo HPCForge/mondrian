@@ -61,7 +61,7 @@ class BubbleMLForecastDataset(torch.utils.data.Dataset):
             (grp_name, timestep)
             for grp_name in self.handle.keys()
             for timestep in range(min_input_timestep, max_input_timestep)
-            if grp_name not in skip
+            if grp_name not in skip and self.handle[grp_name].attrs['heater_temp'] < 95
         ]
 
     def __del__(self):
@@ -78,12 +78,7 @@ class BubbleMLForecastDataset(torch.utils.data.Dataset):
         vely = normalize_vely(grp["vely"][start_time:end_time:step])
         temperature = normalize_temperature(grp["temperature"][start_time:end_time:step])
         dfun = normalize_dfun(grp["dfun"][start_time:end_time:step])
-        
-        #if self.use_mask:
-        #    dfun = (dfun > 0).astype(float) - 0.5
-        #else:
-        #    dfun = normalize_dfun(dfun)
-    
+
         variables = [velx, vely, temperature, dfun]
         if use_heater_temp:
             # heater temp ranges from 90-100, so just applying a simple normalization

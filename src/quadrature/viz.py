@@ -34,6 +34,8 @@ def main(cfg):
     module = SimpleModule.load_from_checkpoint(cfg.model_ckpt_path)
     module = module.cpu()
     
+    print(module.model)
+    
     # sets the default quadrature method for any integrals evaluated by the model
     set_default_quadrature_method(cfg.experiment.quadrature_method)
     set_default_qkv_operator(cfg.experiment.linear_operator)
@@ -83,7 +85,7 @@ def main(cfg):
     axarr[1, 1].set_xlabel('Prediction')
     axarr[1, 2].set_xlabel('Ground Truth')
     axarr[1, 3].set_xlabel('Squared Error')
-    plt.savefig('ac.pdf')
+    plt.savefig('ac.png')
     
 
     with torch.no_grad():

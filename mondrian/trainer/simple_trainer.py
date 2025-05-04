@@ -4,7 +4,7 @@ import torch.nn.functional as F
 import lightning as L
 
 from mondrian.metrics import Metrics
-from mondrian.lr_schedule import WarmupCosineAnnealingLR
+from mondrian.lr_schedule import WarmupCosineAnnealingLR, WarmupCosineAnnealingWarmRestartsLR
 
 def interface_mse(pred, target):
     r"""
@@ -30,6 +30,7 @@ class SimpleModule(L.LightningModule):
         lr=0.001,
         weight_decay=1e-4,
         warmup_iters=1000,
+        eta_min=1e-8
     ):
         super().__init__()
         self.save_hyperparameters()
@@ -39,6 +40,7 @@ class SimpleModule(L.LightningModule):
         self.lr = lr
         self.weight_decay = weight_decay
         self.warmup_iters = warmup_iters
+        self.eta_min = eta_min
         self.metrics = Metrics(self.log)
 
     def configure_optimizers(self):
@@ -49,8 +51,14 @@ class SimpleModule(L.LightningModule):
             optimizer,
             warmup_iters=self.warmup_iters,
             total_iters=self.total_iters,
-            eta_min=1e-8,
+            eta_min=self.eta_min,
         )
+        #scheduler = WarmupCosineAnnealingWarmRestartsLR(
+        #    optimizer,
+        #    warmup_iters=self.warmup_iters,
+        #    total_iters=self.total_iters,
+        #    eta_min=self.eta_min,
+        #)
         scheduler_config = {"scheduler": scheduler, "interval": "step"}
         return [optimizer], [scheduler_config]
 

@@ -47,7 +47,7 @@ def build_dataset(size, num_interp_points, filename):
   128 points, applying some stupid operator to it, and then
   interpolating the output.
   """
-  num_points = 128
+  num_points = num_interp_points
 
   rng = np.random.default_rng()
   
@@ -63,7 +63,7 @@ def build_dataset(size, num_interp_points, filename):
     
     input = np.exp(a * x * y)
     label = a * y * np.exp(a * x * y)
-        
+    """
     # get points of original grid
     points = cell_centered_grid(num_points)
     
@@ -85,10 +85,10 @@ def build_dataset(size, num_interp_points, filename):
       label_interpolator = RegularGridInterpolator((points, points), label, method='cubic')
       label_interp = label_interpolator(interp_points)
       label_interp = label_interp.reshape(num_interp_points, num_interp_points)
+    """
+    dataset_input.append(torch.from_numpy(input))
+    dataset_label.append(torch.from_numpy(label))
 
-    dataset_input.append(torch.from_numpy(input_interp))
-    dataset_label.append(torch.from_numpy(label_interp))
-      
   dataset_input = torch.stack(dataset_input).to(torch.float32)
   dataset_label = torch.stack(dataset_label).to(torch.float32)
 
@@ -96,21 +96,23 @@ def build_dataset(size, num_interp_points, filename):
     handle.create_dataset('input', data=dataset_input)
     handle.create_dataset('label', data=dataset_label)
 
-train_size = 100
-val_size = 10
-test_size = 10
+train_size = 2000
+val_size = 1000
+test_size = 1000
+fine_size = 100
+
+
+build_dataset(train_size, 16, 'train_16.hdf5')
+build_dataset(val_size, 16, 'val_16.hdf5')
 
 build_dataset(train_size, 64, 'train_64.hdf5')
 build_dataset(val_size, 64, 'val_64.hdf5')
 
-build_dataset(test_size, 16, 'test_16.hdf5')
-build_dataset(test_size, 32, 'test_32.hdf5')
-build_dataset(test_size, 48, 'test_48.hdf5')
-build_dataset(test_size, 64, 'test_64.hdf5')
-build_dataset(test_size, 80, 'test_80.hdf5')
-build_dataset(test_size, 96, 'test_96.hdf5')
-build_dataset(test_size, 112, 'test_112.hdf5')
+for res in [16, 32, 48, 64, 80, 96, 112, 128, 256, 512]:
+  build_dataset(test_size, res, f'test_{res}.hdf5')
+  build_dataset(fine_size, res, f'fine_{res}.hdf5')
 
+print('done')
 
 with h5py.File('test_64.hdf5') as handle:
   input_64 = handle['input'][0]

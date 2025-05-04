@@ -79,6 +79,8 @@ def get_model(in_channels, out_channels, model_cfg):
             num_layers=model_cfg.num_layers,
             max_seq_len=model_cfg.max_seq_len,
             subdomain_size=model_cfg.subdomain_size,
+            qkv_config=model_cfg.qkv_config,
+            ff_config=model_cfg.ff_config
         )
     if model_cfg.name == _SWIN_SA_OPERATOR_2D:
         return SwinSAOperator2d(
