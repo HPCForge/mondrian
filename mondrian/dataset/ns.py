@@ -9,11 +9,11 @@ DECAYING_STD = 9.7
 FIELD = 'ns_decaying_turbulence'
 
 class PDEArenaNSDataset(torch.utils.data.Dataset):
-    def __init__(self, path_to_data, transform):
+    def __init__(self, path_to_data, transform, step_range=2):
         self.transform = transform
         self.data = h5py.File(path_to_data, 'r')
         
-        self.range = 2
+        self.range = step_range
         self.in_channels = self.range
         self.out_channels = self.range
         
