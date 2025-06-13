@@ -8,7 +8,7 @@ from mondrian.grid.decompose import win_decompose2d, win_recompose2d
 from mondrian.attention.swin_func_self_attention import SwinFuncSelfAttention
 from mondrian.layers.seq_op import seq_op
 from mondrian.layers.learned_pos_embedding import LearnedPosEmbedding2d
-from mondrian.layers.feed_forward_operator import get_default_feed_forward_operator
+from mondrian.layers.feed_forward_operator import get_default_feed_forward_operator, get_feed_forward_operator
 
 
 class SequenceGroupNorm2d(nn.Module):
@@ -20,15 +20,15 @@ class SequenceGroupNorm2d(nn.Module):
         return seq_op(self.norm, v)
 
 class Encoder(nn.Module):
-  def __init__(self, embed_dim, num_heads, head_split, use_bias, shift_size, n_sub_x, n_sub_y, window_size):
+  def __init__(self, embed_dim, num_heads, head_split, use_bias, shift_size, n_sub_x, n_sub_y, window_size, ff_config, qkv_config):
     super().__init__()
     self.shift_size = shift_size
     self.sa = SwinFuncSelfAttention(
-      embed_dim, num_heads, head_split, use_bias, shift_size, n_sub_x, n_sub_y, window_size
+      embed_dim, num_heads, head_split, use_bias, shift_size, n_sub_x, n_sub_y, window_size, qkv_config
     )
 
     # One option is to use FNO, but that seems to work really poorly...
-    self.mlp = get_default_feed_forward_operator(embed_dim, embed_dim, embed_dim)
+    self.mlp = get_feed_forward_operator(in_channels=embed_dim, out_channels=embed_dim, hidden_channels=embed_dim, **ff_config)
     self.norm1 = SequenceGroupNorm2d(8, embed_dim)
     self.norm2 = SequenceGroupNorm2d(8, embed_dim)
     
@@ -68,7 +68,10 @@ class SwinSAOperator2d(nn.Module):
                shift_size: int,
                n_sub_x: int,
                n_sub_y: int,
-               subdomain_size: Union[int, Tuple[int, int]]):
+               subdomain_size: Union[int, Tuple[int, int]],
+               qkv_config: dict,
+               ff_config: dict
+               ):
     super().__init__()
     self.in_channels = in_channels
     self.out_channels = out_channels
@@ -94,12 +97,14 @@ class SwinSAOperator2d(nn.Module):
               shift_size=0 if (i%2==0) else self.shift_size , 
               n_sub_x=self.n_sub_x,
               n_sub_y=self.n_sub_y, 
-              window_size=self.window_size) 
+              window_size=self.window_size,
+              ff_config=ff_config,
+              qkv_config=qkv_config,) 
       for i in range(num_layers)
     ])
     
-    self.input_project = get_default_feed_forward_operator(in_channels, embed_dim, hidden_channels=embed_dim)
-    self.output_project = get_default_feed_forward_operator(embed_dim, out_channels, hidden_channels=embed_dim)
+    self.input_project = get_feed_forward_operator(in_channels=in_channels, out_channels=embed_dim, hidden_channels=embed_dim, **ff_config)
+    self.output_project = get_feed_forward_operator(in_channels=embed_dim, out_channels=out_channels, hidden_channels=embed_dim, **ff_config)
     self.pos_embedding = LearnedPosEmbedding2d(
             seq_len=window_size**2, channels=embed_dim
         )
