@@ -12,13 +12,9 @@ logger_version: 'version'
 train_workers: 0
 test_workers: 0
 
-num_input_timesteps: 8
-input_step_size: 1
-lead_time: 8
-
-quadrature_method: 'simpson_13'
-linear_operator: 'low_rank_interp_linear_operator'
-neural_operator: 'attention_neural_operator'
+quadrature_method: 'reimann'
+linear_operator: 'low_rank_linear_operator'
+neural_operator: 'low_rank_neural_operator'
 spectral_conv_modes: 4
 
 train_cfg:
@@ -29,20 +25,23 @@ train_cfg:
   warmup_iters: 500
 
 model_cfg:
-  name: 'vit_operator_padding_2d'
+  name: 'swin_sa_operator_2d'
   embed_dim: 64
-  channel_heads: 4
-  x_heads: 1
-  y_heads: 1
-  attn_neighborhood_radius: null
+  num_heads: 4
+  head_split: 'channel'
   num_layers: 4
+  max_seq_len: 64
+  window_size: 4
+  shift_size: 2
   subdomain_size: [1, 1]
-  # on 32x32 disc this has 64 subdomains that are 4x4
-  domain_size: [4, 4]
-  max_seq_len: 16
+  n_sub_x: 8
+  n_sub_y: 8
+  domain_size: [8, 8]
   qkv_config:
     name: 'spectral_conv'
-    n_modes: 8
+    # n_modes: 4
+    # n: 64
   ff_config:
     name: 'spectral_conv_neural_operator'
-    n_modes: 8
+    # n_modes: 4
+    # n: 64

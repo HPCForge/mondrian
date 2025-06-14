@@ -95,6 +95,8 @@ def get_model(in_channels, out_channels, model_cfg):
             n_sub_x=model_cfg.n_sub_x,
             n_sub_y=model_cfg.n_sub_y,
             subdomain_size=model_cfg.subdomain_size,
+            qkv_config=model_cfg.qkv_config,
+            ff_config=model_cfg.ff_config
         )
     if model_cfg.name == _UNET_OPERATOR_2D:
         return UnetOperator2d(

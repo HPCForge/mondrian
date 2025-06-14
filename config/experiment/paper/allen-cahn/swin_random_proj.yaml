@@ -26,7 +26,7 @@ train_cfg:
 
 model_cfg:
   name: 'swin_sa_operator_2d'
-  embed_dim: 16
+  embed_dim: 64
   num_heads: 4
   head_split: 'channel'
   num_layers: 4
