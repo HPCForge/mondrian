@@ -26,7 +26,7 @@ train_cfg:
 
 model_cfg:
   name: 'swin_sa_operator_2d'
-  embed_dim: 16
+  embed_dim: 64
   num_heads: 4
   head_split: 'channel'
   num_layers: 4
@@ -38,10 +38,10 @@ model_cfg:
   n_sub_y: 8
   domain_size: [8, 8]
   qkv_config:
-    name: 'random_project_linear_operator'
+    name: 'neural_operator'
     # n_modes: 4
-    n: 64
+    # n: 64
   ff_config:
-    name: 'random_project_neural_operator'
+    name: 'linear_operator'
     # n_modes: 4
-    n: 64
+    # n: 64

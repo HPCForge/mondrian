@@ -2,9 +2,8 @@ name: ns
 
 train_data_path: 'train/data/path'
 
-# TODO: these are the same while I test things
 test_data_path: 'test/data/path'
-
+model_ckpt_path: 'model/checkpoint/path'
 logger_version: 'version'
 
 train_workers: 16
@@ -29,21 +28,23 @@ train_cfg:
   data_range: 2
 
 model_cfg:
-  name: 'vit_operator_2d'
-  embed_dim: 128
-  channel_heads: 4
-  x_heads: 1
-  y_heads: 1
-  attn_neighborhood_radius: 2
+  name: 'swin_sa_operator_2d'
+  embed_dim: 64
+  num_heads: 4
+  head_split: 'channel'
+  window_size: 16
+  shift_size: 4
   num_layers: 4
   subdomain_size: [1, 1]
   domain_size: [32, 32]
+  n_sub_x: 32
+  n_sub_y: 32
   max_seq_len: 1024
   qkv_config:
-    name: 'separable_random_project_linear_operator'
+    name: 'attention_linear_operator'
     # n_modes: 4
-    n: 256
+    # n: 64
   ff_config:
-    name: 'separable_random_project_neural_operator'
+    name: 'attention_neural_operator'
     # n_modes: 4
-    n: 256
+    # n: 64

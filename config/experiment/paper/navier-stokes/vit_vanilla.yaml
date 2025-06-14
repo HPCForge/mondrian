@@ -1,16 +1,14 @@
-name: allen_cahn
+name: ns
 
-data_path: 'data/path'
+train_data_path: 'train/data/path'
 
-test_data_paths:
-  - 'test/data/path1'
-  - 'test/data/path2'
-  - 'test/data/path3'
+# TODO: these are the same while I test things
+test_data_path: 'test/data/path'
 
 logger_version: 'version'
 
-train_workers: 0
-test_workers: 0
+train_workers: 16
+test_workers: 16
 
 num_input_timesteps: 8
 input_step_size: 1
@@ -22,14 +20,16 @@ neural_operator: 'attention_neural_operator'
 spectral_conv_modes: 4
 
 train_cfg:
-  batch_size: 128
-  max_steps: 30000
+  batch_size: 32
+  max_steps: 100000
   lr: 0.001
-  weight_decay: 0.01
+  weight_decay: 1e-4
   warmup_iters: 500
+  eta_min: 1e-5
+  data_range: 2
 
 model_cfg:
-  name: 'vit_operator_padding_2d'
+  name: 'vit_operator_2d'
   embed_dim: 64
   channel_heads: 4
   x_heads: 1
@@ -37,12 +37,13 @@ model_cfg:
   attn_neighborhood_radius: null
   num_layers: 4
   subdomain_size: [1, 1]
-  # on 32x32 disc this has 64 subdomains that are 4x4
-  domain_size: [4, 4]
-  max_seq_len: 16
+  domain_size: [32, 32]
+  max_seq_len: 1024
   qkv_config:
-    name: 'spectral_conv'
-    n_modes: 8
+    name: 'neural_operator'
+    # n_modes: 4
+    # n: 64
   ff_config:
-    name: 'spectral_conv_neural_operator'
-    n_modes: 8
+    name: 'linear_operator'
+    # n_modes: 4
+    # n: 64

@@ -19,6 +19,7 @@ lead_time: 8
 quadrature_method: 'simpson_13'
 linear_operator: 'low_rank_interp_linear_operator'
 neural_operator: 'attention_neural_operator'
+
 spectral_conv_modes: 4
 
 train_cfg:
@@ -29,8 +30,8 @@ train_cfg:
   warmup_iters: 500
 
 model_cfg:
-  name: 'vit_operator_padding_2d'
-  embed_dim: 64
+  name: 'vit_operator_2d'
+  embed_dim: 128
   channel_heads: 4
   x_heads: 1
   y_heads: 1
@@ -38,11 +39,11 @@ model_cfg:
   num_layers: 4
   subdomain_size: [1, 1]
   # on 32x32 disc this has 64 subdomains that are 4x4
-  domain_size: [4, 4]
-  max_seq_len: 16
+  domain_size: [8, 8]
+  max_seq_len: 64
   qkv_config:
-    name: 'spectral_conv'
-    n_modes: 8
+    name: 'separable_random_project_linear_operator'
+    n: 256
   ff_config:
-    name: 'spectral_conv_neural_operator'
-    n_modes: 8
+    name: 'separable_random_project_neural_operator'
+    n: 256
