@@ -1,11 +1,11 @@
 name: allen_cahn
 
-data_path: '/share/crsp/lab/amowli/share/mondrian/allen_cahn/fix_allen_cahn_20000_32.hdf5'
+data_path: 'data/path'
 
 test_data_paths:
-  - '/share/crsp/lab/amowli/share/mondrian/allen_cahn/fix_allen_cahn_2000_32.hdf5'
-  - '/share/crsp/lab/amowli/share/mondrian/allen_cahn/fix_allen_cahn_2000_64.hdf5'
-  - '/share/crsp/lab/amowli/share/mondrian/allen_cahn/fix_allen_cahn_2000_128.hdf5'
+  - 'test/data/path1'
+  - 'test/data/path2'
+  - 'test/data/path3'
 
 train_workers: 0
 test_workers: 0

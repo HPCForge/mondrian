@@ -9,7 +9,7 @@ from ..grid.decompose import win_decompose2d, win_recompose2d
 from ..layers.log_cpb import LogCPB
 from ..grid.utility import is_power_of_2
 from ..constants import HEAD_SPLIT_OPTIONS
-from ..layers.qkv_operator import get_default_qkv_operator
+from ..layers.qkv_operator import get_default_qkv_operator, get_qkv_operator
 
 @torch.compile
 class SwinFuncSelfAttention(nn.Module):
@@ -23,6 +23,7 @@ class SwinFuncSelfAttention(nn.Module):
         n_sub_x: int,
         n_sub_y: int,
         window_size: int,
+        qkv_config: dict,
     ):
       super().__init__()
       assert head_split in HEAD_SPLIT_OPTIONS
@@ -34,8 +35,8 @@ class SwinFuncSelfAttention(nn.Module):
       self.head_split = head_split
       self.use_bias = use_bias
       
-      self.qkv_operator = get_default_qkv_operator(embed_dim, 3 * embed_dim, bias=False)
-      self.output_operator = get_default_qkv_operator(embed_dim, embed_dim, bias=True)
+      self.qkv_operator = get_qkv_operator(in_channels=embed_dim, out_channels=3 * embed_dim, bias=False, **qkv_config)
+      self.output_operator = get_qkv_operator(in_channels=embed_dim, out_channels=embed_dim, bias=True, **qkv_config)
       
       if use_bias:
           self.log_cpb = LogCPB(embed_dim, num_heads)
